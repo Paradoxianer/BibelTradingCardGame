@@ -4,3 +4,8 @@ CardStack::CardStack()
 {
 
 }
+
+CardStack::~CardStack()
+{
+
+}
