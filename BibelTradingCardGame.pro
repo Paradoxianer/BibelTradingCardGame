@@ -18,14 +18,16 @@ SOURCES += main.cpp\
     deck.cpp \
     cardboard.cpp \
     game.cpp \
-    cardstack.cpp
+    cardstack.cpp \
+    strength.cpp
 
 HEADERS  += mainwindow.h \
     card.h \
     deck.h \
     cardboard.h \
     game.h \
-    cardstack.h
+    cardstack.h \
+    strength.h
 
 FORMS    += mainwindow.ui
 
