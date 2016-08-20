@@ -6,6 +6,8 @@
 #include <QString>
 
 #include "strength.h"
+#include "action.h"
+#include "cardstack.h"
 
 class Card
 {
@@ -21,6 +23,7 @@ private:
     QString*        name;
     QString*        verse;
     QString*        scripture;
+
 };
 
 #endif // CARD_H

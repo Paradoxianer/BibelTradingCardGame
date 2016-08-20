@@ -1,8 +1,9 @@
 #ifndef DECK_H
 #define DECK_H
 
+#include "cardstack.h"
 
-class Deck
+class Deck : public CardStack
 {
 public:
     Deck();
