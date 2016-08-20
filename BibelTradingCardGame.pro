@@ -19,7 +19,8 @@ SOURCES += main.cpp\
     cardboard.cpp \
     game.cpp \
     cardstack.cpp \
-    strength.cpp
+    strength.cpp \
+    action.cpp
 
 HEADERS  += mainwindow.h \
     card.h \
@@ -27,7 +28,8 @@ HEADERS  += mainwindow.h \
     cardboard.h \
     game.h \
     cardstack.h \
-    strength.h
+    strength.h \
+    action.h
 
 FORMS    += mainwindow.ui
 

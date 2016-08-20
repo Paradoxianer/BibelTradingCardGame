@@ -6,12 +6,11 @@
 class Strength
 {
 public:
-    Strength(int  howMuch=1;QPoint there=NULL,float howBig=1.0);
-    QPoint  Where(){return where;}
-    float   Size(){return size;}
-    int     HowStrong(){return strenght;}
-    s
-private
+    Strength(int  howMuch=1, QPoint there =QPoint(0,0), float howBig=1.0);
+    QPoint  Where(){return where;};
+    float   Size(){return size;};
+    int     HowStrong(){return strenght;};
+private:
     float   size;
     QPoint  where;
     int     strenght;

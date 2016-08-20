@@ -1,8 +1,8 @@
 #include "strength.h"
 
-Strength::Strength(int  howMuch=1;QPoint there=NULL,float howBig=1.0)
+Strength::Strength(int  howMuch,QPoint there,float howBig)
 {
-    Strength    = howMuch;
+    strenght    = howMuch;
     size        = howBig;
     where       = there;
 }
