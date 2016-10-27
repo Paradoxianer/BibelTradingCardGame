@@ -20,15 +20,16 @@ public:
 	QString*	scripture(){return myScripture;}
 
 	void		layedOnCardStack(CardStack *stack);
-	CardStack	cardStack(){return onStack;};
+	CardStack*	cardStack(){return onStack;};
 	void		takenFromCardStack();
 	Card*		previosCard();
 	Card*		nextCard();
 
 
 private:
-	QList<QRect>	provides;
-	QList<Strength>	requires;
+	void			Init();
+	QList<QRect>	*provides;
+	QList<Strength>	*requires;
 	QString			*myName;
 	QString			*myVerse;
 	QString			*myScripture;

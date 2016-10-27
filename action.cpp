@@ -10,8 +10,8 @@ Action::Action(Card *fromCard, Game *forGame)
 
 void Action::Init()
 {
-    source      = new QList<Card>();
-    target      = new QList<Card>();
+	source      = new QList<Card*>();
+	target      = new QList<Card*>();
     universe    = NULL;
 
 }

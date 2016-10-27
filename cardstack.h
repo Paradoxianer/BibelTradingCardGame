@@ -1,8 +1,9 @@
 #ifndef CARDSTACK_H
 #define CARDSTACK_H
 
-#include "card.h"
 #include <qlist.h>
+
+class Card;
 
 class CardStack
 {

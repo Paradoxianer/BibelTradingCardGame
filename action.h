@@ -9,18 +9,18 @@ class Card;
 class Action
 {
 public:
-    Action(Card *fromCard, Game *forGame);
+			Action(Card *fromCard, Game *forGame);
     void    Init(void);
     void    AddSourceCard(Card *fromCard);
     void    RemoveSourceCard(Card *fromCard);
 
-    virtual void Do(QList<Card> *targetCards);
-    virtual void Do(Card    *targetCard);
-
-);
+	void	Do(QList<Card> *targetCards);
+	void	Do(Card    *targetCard);
 
 private:
-    QList<Card> *source;
+	QList<Card*> *source;
+	QList<Card*> *target;
+	Game		*universe;
 };
 
 #endif // ACTION_H

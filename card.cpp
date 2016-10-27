@@ -1,17 +1,22 @@
 #include "card.h"
 
-Card::Card(),
-	name(NULL),
-	myName(NULL),
-	myVerse(NULL),
-	myScripture(NULL)
-	onStack(NULL)
+Card::Card()
 {
-
+	Init();
 }
 
 Card::Card(QString *name, QString *verse, QString *scripture)
 {
+	Init();
+}
 
+void Card::Init()
+{
+	provides	= new QList<QRect>();
+	requires	= new QList<Strength>();
+	myName		= NULL;
+	myVerse		= NULL;
+	myScripture	= NULL;
+	onStack		= NULL;
 }
 
