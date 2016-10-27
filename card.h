@@ -12,18 +12,18 @@
 class Card
 {
 public:
-	Card();
-	Card(QString *name,QString *verse,QString *scripture);
+				Card();
+				Card(QString *name,QString *verse,QString *scripture);
 
-	QString* name(){return myName;}
-    QString* verse(){return myVerse;}
-    QString* scripture(){return myScripture;}
+	QString*	name(){return myName;}
+	QString*	verse(){return myVerse;}
+	QString*	scripture(){return myScripture;}
 
-	void	layedOnCardStack(CardStack *stack);
-	bool	onCardStack();
-	void	takenFromCardStack();
-	Card*	previosCard();
-	Card*	nextCard();
+	void		layedOnCardStack(CardStack *stack);
+	CardStack	cardStack(){return onStack;};
+	void		takenFromCardStack();
+	Card*		previosCard();
+	Card*		nextCard();
 
 
 private:
@@ -33,7 +33,6 @@ private:
 	QString			*myVerse;
 	QString			*myScripture;
 	CardStack		*onStack;
-
 
 };
 
