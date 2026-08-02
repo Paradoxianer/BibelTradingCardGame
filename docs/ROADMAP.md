@@ -76,18 +76,8 @@ spielbar; alle Regelwerk-Tests grün.
 
 ### Shop-Leitplanken (verbindlich, vor der Umsetzung festgelegt)
 
-1. **Kein Pay-to-win.** Seltenheit bedeutet Vielfalt und Sammelreiz, nicht
-   Spielstärke. Turnier-/Standarddecks müssen aus häufigen Karten baubar sein.
-2. **Keine digitalen Zufallskäufe für Geld.** Lootbox-Mechaniken sind in
-   mehreren Ländern reguliert (u. a. Belgien, Niederlande) und für ein
-   christliches Spiel mit jungem Publikum auch inhaltlich die falsche Wahl.
-   Erlaubt sind stattdessen:
-   - Pakete mit **sichtbarem Inhalt** (man weiß vor dem Kauf, was drin ist),
-   - Booster, die durch **Spielen verdient** werden (kein Echtgeld),
-   - **physische** Booster mit Claim-Code, die digitale Karten freischalten.
-3. **Karten sind nutzbar, nicht spekulativ.** Kein selbst betriebener
-   Handelsplatz mit Echtgeldpreisen; Tausch zwischen Konten dagegen ja.
-4. Voraussetzung im Datenmodell: Feld `seltenheit`
+1. Seltenheit bedeutet Vielfalt und Sammelreiz, Turnier-/Standarddecks müssen aus häufigen Karten baubar sein.
+2. Voraussetzung im Datenmodell: Feld `seltenheit`
    (KARTEN_SPEZIFIKATION §7) — muss vor dem ersten Set-Release gepflegt sein.
 
 ### Druck

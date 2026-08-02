@@ -36,7 +36,7 @@ Engine, App und Tools als Dart-Workspace/Melos oder schlicht via
 ## 2. Engine-Design
 
 **Zustand:** `GameState` ist unveränderlich (immutable). Enthält: Spieler
-(Heiligkeit, Hand, Deck-Rest), je Spieler 3 Stapel (Kartenlisten, Index 0 =
+(Heiligkeit, Hand, Deck-Rest),je Spieler 3 Stapel (Kartenlisten, Index 0 =
 oben), aktive globale Effekte, Rundenzähler, Phase, RNG-Seed.
 
 **Ablauf:** Command → Validierung → neuer `GameState` + Events.

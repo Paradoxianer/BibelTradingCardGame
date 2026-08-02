@@ -137,6 +137,7 @@ komplett kippen.
   `"eigen"`.
 - `dauer`: `sofort`
 - Design-Hinweise:
+  - Wichtig (Startkarte - ist ausgenommen (Evil))
   - Dies ist die **einzige sanktionierte Ausnahme** von der eingefrorenen
     Stapel-Reihenfolge (REGELWERK D3-A) — genau der dort erwähnte „seltene
     Karteneffekt". Entsprechend: `anzahlImDeckMax: 1`, hohe Effektkosten.

@@ -41,10 +41,8 @@ einchecken, README erneuern. Danach Phase 1 Schritt 1 (Datenmodell + Parser)
   Format und Datenfehler sind in KARTEN_SPEZIFIKATION v0.2 dokumentiert.
   Fehlend: Kategorien `tun` und `lehre`, echtes Artwork (alles Placeholder).
 - ID-Schema-Unschärfen (Präfix `RG` für zwei Kategorien u. a.):
-  KARTEN_SPEZIFIKATION §4 — vor einer Änderung Rücksprache, IDs könnten
-  bereits gedruckt sein.
+  KARTEN_SPEZIFIKATION §4 — vor einer Änderung Rücksprache
 - **Shop/Booster** ist Thema für Phase 3; Leitplanken stehen in ROADMAP
-  (kein Pay-to-win, keine digitalen Lootboxen für Echtgeld).
 
 ## Bekannte Design-Risiken (für spätere Simulation vormerken)
 
