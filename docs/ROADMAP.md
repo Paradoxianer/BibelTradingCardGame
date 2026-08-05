@@ -103,6 +103,13 @@ neue, noch offene Aufgabe:
 ## Bewusst NICHT im Scope (bis mindestens Phase 2)
 
 - Kein Blockchain/NFT
-- Keine KI-Gegner über simple Bots hinaus
-- Kein iOS-Build (erst wenn PWA/Android stehen)
+- Keine KI-Gegner über simple Bots hinaus (Greedy/Zufall/Defensiv/Anführer
+  aus `engine/bots/` sind genau diese Grenze — als Solo-Gegner in der App
+  verdrahtet, keine weitere KI geplant)
 - Keine Effekt-Engine „auf Vorrat" — Effekte erst, wenn konkrete Karten sie brauchen
+
+**iOS ist seit 2026-08-05 im Scope** (ursprünglich hier ausgeschlossen bis
+Phase 2 — auf expliziten Wunsch vorgezogen). Projektgerüst
+(`app/ios/`) ist angelegt; Build/Test brauchen Xcode auf macOS und sind auf
+einer reinen Linux-Entwicklungsumgebung nicht möglich (siehe
+ARCHITEKTUR.md §3).

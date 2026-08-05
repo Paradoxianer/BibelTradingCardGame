@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:btcg_engine/bots/bots.dart';
 import 'package:btcg_engine/engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -18,7 +19,11 @@ class StartScreen extends StatefulWidget {
 class _StartScreenState extends State<StartScreen> {
   late final Future<Kartenset> _kartenset = ladeKartenset();
 
-  void _neuesSpielStarten(BuildContext context, Kartenset kartenset) {
+  void _spielStarten(
+    BuildContext context,
+    Kartenset kartenset, {
+    required Map<String, Bot> botSpieler,
+  }) {
     final random = Random();
     final seed = random.nextInt(1 << 31);
     final aufbau = [
@@ -30,7 +35,7 @@ class _StartScreenState extends State<StartScreen> {
       ),
       baueZufaelligesDeck(
         id: 'p2',
-        name: 'Spieler 2',
+        name: botSpieler.containsKey('p2') ? 'Computer' : 'Spieler 2',
         alleKarten: kartenset.alleKarten,
         seed: seed + 1,
       ),
@@ -43,10 +48,10 @@ class _StartScreenState extends State<StartScreen> {
           create: (_) => GameBloc(
             anfangszustand: anfangszustand,
             kartenset: kartenset,
+            botSpieler: botSpieler,
+            botSeed: seed + 2,
           ),
-          child: SpielScreen(
-            onNeuesSpiel: () => Navigator.of(context).pop(),
-          ),
+          child: SpielScreen(onNeuesSpiel: () => Navigator.of(context).pop()),
         ),
       ),
     );
@@ -77,8 +82,21 @@ class _StartScreenState extends State<StartScreen> {
                 Text('${kartenset.alleKarten.length} Karten geladen (Set ${kartenset.set})'),
                 const SizedBox(height: 32),
                 FilledButton(
-                  onPressed: () => _neuesSpielStarten(context, kartenset),
+                  onPressed: () => _spielStarten(
+                    context,
+                    kartenset,
+                    botSpieler: const {},
+                  ),
                   child: const Text('Neues Hotseat-Spiel (2 Spieler)'),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton(
+                  onPressed: () => _spielStarten(
+                    context,
+                    kartenset,
+                    botSpieler: const {'p2': GreedyBot()},
+                  ),
+                  child: const Text('Gegen den Computer spielen'),
                 ),
               ],
             );

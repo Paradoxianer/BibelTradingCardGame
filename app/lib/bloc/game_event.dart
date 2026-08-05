@@ -33,3 +33,11 @@ class ReaktionskarteAngetippt extends GameUiEvent {
 class UebergabeBestaetigt extends GameUiEvent {
   const UebergabeBestaetigt();
 }
+
+/// Internes Kickoff-Event: prüft, ob ein Bot am Zug ist, und lässt ihn
+/// spielen. Nötig für den Sonderfall "Bot ist zufällig Startspieler", bei
+/// dem noch kein UI-Intent stattgefunden hat, der [GameBloc] sonst zum
+/// automatischen Weiterspielen anstößt.
+class BotZugAusloesen extends GameUiEvent {
+  const BotZugAusloesen();
+}

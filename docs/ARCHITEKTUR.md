@@ -66,13 +66,18 @@ der Engine als geparste Objekte übergeben; Laden/Parsen macht die App bzw. das 
 
 ## 3. App (Phase 1: Hotseat)
 
-- **Flutter Web (PWA) + Android**, Deployment wie flying_words über GitHub Pages.
+- **Flutter Web (PWA) + Android + iOS**, Deployment wie flying_words über
+  GitHub Pages (Web). iOS-Build/-Test braucht Xcode auf macOS — auf einer
+  Linux-Entwicklungsumgebung kann nur das Projektgerüst gepflegt werden,
+  nicht kompiliert/verifiziert werden. Dafür entweder einen Mac oder einen
+  Mac-CI-Runner (z. B. Codemagic, GitHub Actions `macos-latest`) einplanen.
 - State-Management: **BLoC** (bewährtes Muster aus DFL/flying_words).
   `GameBloc` hält den `GameState`, übersetzt UI-Intents in Commands und Events
   in UI-Zustände. Keine Spiellogik im Bloc.
 - **Hotseat zuerst:** 2 Spieler an einem Gerät, Übergabe-Screen („Gerät an
-  Spieler 2 geben") verdeckt Handkarten. Danach optional Bot-Gegner aus
-  `engine/bots/`.
+  Spieler 2 geben") verdeckt Handkarten. **Bot-Gegner aus `engine/bots/`**
+  (GreedyBot) steht als Solo-Modus zur Verfügung — kein Übergabe-Screen
+  nötig, der Bot zieht automatisch, sobald er an der Reihe ist.
 - **Kern-UI-Herausforderung — Loch-Darstellung:** Der Stapel wird als *eine*
   zusammengesetzte Karte gerendert: pro Slot wird das oberste nicht-Loch-Symbol
   angezeigt, mit Tiefen-Hinweis (z. B. leichter Versatz/Schatten der
