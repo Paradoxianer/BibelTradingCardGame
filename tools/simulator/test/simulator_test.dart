@@ -64,6 +64,11 @@ void main() {
       expect(ergebnis.startspielerWinrate, inInclusiveRange(0, 1));
       final summeAnteile = ergebnis.kategorieAnteile.values.fold(0.0, (a, b) => a + b);
       expect(summeAnteile, closeTo(1.0, 0.001));
+
+      expect(ergebnis.medianFuehrungswechsel, greaterThanOrEqualTo(0));
+      expect(ergebnis.wertungsSchwankung, greaterThanOrEqualTo(0));
+      expect(ergebnis.genutzteKartenvielfalt, inInclusiveRange(0, 1));
+      expect(ergebnis.meistgespielteKarten(top: 3).length, lessThanOrEqualTo(3));
     });
 
     test('ohne Evil ist Evil-Phase immer ein Passen', () {
@@ -89,6 +94,10 @@ void main() {
         startspielerSiege: 1,
         kategorieSummen: const {Kategorie.gebet: 1000, Kategorie.evil: -900},
         personSummen: const {},
+        fuehrungswechsel: const [2],
+        alleWertungsWerte: const [1, -1, 2],
+        gespielteKartenGesamt: const {},
+        kartenpoolGroesse: 0,
       );
       final anteile = ergebnis.kategorieAnteile;
       for (final wert in anteile.values) {
@@ -102,6 +111,34 @@ void main() {
       expect(median([1, 2, 3]), 2);
       expect(median([1, 2, 3, 4]), 2.5);
       expect(median([]), 0);
+    });
+
+    test('stddev ist 0 bei konstanten Werten und > 0 bei Streuung', () {
+      expect(stddev([5, 5, 5, 5]), 0);
+      expect(stddev([]), 0);
+      expect(stddev([1]), 0);
+      expect(stddev([0, 10]), closeTo(7.07, 0.01));
+    });
+
+    test('genutzteKartenvielfalt und meistgespielteKarten', () {
+      final ergebnis = SammelErgebnis(
+        anzahlPartien: 1,
+        abgebrochen: 0,
+        zuege: const [10],
+        tiefpunkte: const [20],
+        startspielerSiege: 1,
+        kategorieSummen: const {},
+        personSummen: const {},
+        fuehrungswechsel: const [1],
+        alleWertungsWerte: const [],
+        gespielteKartenGesamt: const {'a': 5, 'b': 2, 'c': 1},
+        kartenpoolGroesse: 10,
+      );
+      expect(ergebnis.genutzteKartenvielfalt, closeTo(0.3, 0.001));
+      expect(
+        ergebnis.meistgespielteKarten(top: 2).map((e) => e.key),
+        ['a', 'b'],
+      );
     });
   });
 }

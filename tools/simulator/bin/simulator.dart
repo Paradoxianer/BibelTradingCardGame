@@ -7,7 +7,11 @@ import 'package:simulator/simulator.dart';
 Bot _botFuer(String name) => switch (name) {
   'greedy' => const GreedyBot(),
   'zufall' => const ZufallsBot(),
-  _ => throw ArgumentError('Unbekannter Bot: $name (erwartet: greedy|zufall)'),
+  'defensiv' => const DefensivBot(),
+  'anfuehrer' => const AnfuehrerBot(),
+  _ => throw ArgumentError(
+    'Unbekannter Bot: $name (erwartet: greedy|zufall|defensiv|anfuehrer)',
+  ),
 };
 
 void main(List<String> arguments) {
@@ -68,6 +72,19 @@ void main(List<String> arguments) {
   print('Startspieler-Winrate: ${(ergebnis.startspielerWinrate * 100).toStringAsFixed(1)}%'
       ' (Zielwert 48-52%)');
   print('Tiefpunkt Heiligkeit (Minimum über alle Partien): ${ergebnis.minTiefpunkt}');
+  print('');
+  print('Spieldynamik:');
+  print('  Führungswechsel je Partie (Median): '
+      '${ergebnis.medianFuehrungswechsel.toStringAsFixed(1)}');
+  print('  Schwankung der Wertung je Zug (Std.-Abw.): '
+      '${ergebnis.wertungsSchwankung.toStringAsFixed(2)}');
+  print('  Genutzte Kartenvielfalt: '
+      '${(ergebnis.genutzteKartenvielfalt * 100).toStringAsFixed(1)}% '
+      '(${ergebnis.gespielteKartenGesamt.length}/${ergebnis.kartenpoolGroesse} Karten mind. 1x gespielt)');
+  print('  Meistgespielte Karten:');
+  for (final e in ergebnis.meistgespielteKarten(top: 5)) {
+    print('    ${e.key}: ${e.value}x');
+  }
   print('');
   print('Punktebeitrag je Kategorie (Anteil am Gesamtbetrag, Zielwert < 35%):');
   final kategorieAnteile = ergebnis.kategorieAnteile.entries.toList()

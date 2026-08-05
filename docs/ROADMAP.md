@@ -63,6 +63,19 @@ spielbar; alle Regelwerk-Tests grün.
 5. Playtests mit echten Menschen (Gemeinde/Jugendgruppe) — Simulation findet
    Ungleichgewichte, aber nicht Spielspaß.
 
+**Simulationsbericht (Bot-Massensimulation über mehrere Bot-Stile):
+[docs/SIMULATION_PHASE1B.md](SIMULATION_PHASE1B.md).** Auffälligster Befund:
+`gebet` trägt 60–78 % der Wertungspunkte bei (Zielwert < 35 %) — direkte
+Folge der Kartenzahl-Schieflage (66 gebet vs. 13/7/0/0). Daraus folgt eine
+neue, noch offene Aufgabe:
+
+- **Kategorien `tun`/`lehre` befüllen, alle Kategorien auf eine ähnliche
+  Kartenzahl bringen** (Zielzahl offen — Redaktionsentscheidung), priorisiert
+  nach den wichtigsten Lehrversen der Bibel. Das ist Inhaltsarbeit
+  (Bibelvers-Auswahl, Kartentexte), keine Code-Aufgabe — Claude Code kann
+  hier höchstens den Import-Workflow bereitstellen (bereits vorhanden,
+  `tools/sheet_import`), nicht die Verse auswählen.
+
 ## Phase 2 — Online & Besitz
 
 - Server mit autoritativer Engine, Matchmaking „Gäste spielen sofort"

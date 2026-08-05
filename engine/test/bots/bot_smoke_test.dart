@@ -49,6 +49,9 @@ void main() {
     'Greedy vs. Greedy': {'p1': const GreedyBot(), 'p2': const GreedyBot()},
     'Zufall vs. Zufall': {'p1': const ZufallsBot(), 'p2': const ZufallsBot()},
     'Greedy vs. Zufall': {'p1': const GreedyBot(), 'p2': const ZufallsBot()},
+    'Defensiv vs. Defensiv': {'p1': const DefensivBot(), 'p2': const DefensivBot()},
+    'Defensiv vs. Greedy': {'p1': const DefensivBot(), 'p2': const GreedyBot()},
+    'Anfuehrer vs. Greedy': {'p1': const AnfuehrerBot(), 'p2': const GreedyBot()},
   }.entries) {
     test('$name: Partien laufen sauber durch (10 Seeds)', () {
       for (var seed = 0; seed < 10; seed++) {
@@ -74,4 +77,54 @@ void main() {
       }
     });
   }
+
+  test('AnfuehrerBot greift bei 3 Spielern immer die höchste Heiligkeit an', () {
+    final evil = testKarte('e1', ['-1', '0', '0', '0', '0', '0'], kategorie: Kategorie.evil);
+    final s1 = testSpieler('angreifer', heiligkeit: 30, hand: [evil]);
+    final s2 = testSpieler('fuehrend', heiligkeit: 80);
+    final s3 = testSpieler('hinten', heiligkeit: 10);
+    final state = testState([
+      s1,
+      s2,
+      s3,
+    ]).copyWith(phase: ZugPhase.evilSpielen, rundeNummer: 2);
+
+    final bot = const AnfuehrerBot();
+    final (command, _) = bot.waehleCommand(
+      state,
+      'angreifer',
+      SeedableRng.seeded(1),
+    );
+
+    expect(command, isA<EvilSpielen>());
+    expect((command as EvilSpielen).zielSpielerId, 'fuehrend');
+  });
+
+  test('3-Spieler-Partien mit gemischten Bots laufen sauber durch (5 Seeds)', () {
+    final bots = <String, Bot>{
+      'p1': const AnfuehrerBot(),
+      'p2': const GreedyBot(),
+      'p3': const DefensivBot(),
+    };
+    for (var seed = 0; seed < 5; seed++) {
+      final anfangszustand = neuesSpiel(
+        spieler: [_aufbau('p1'), _aufbau('p2'), _aufbau('p3')],
+        seed: seed,
+      );
+      final erwarteteKartenzahl = _gesamtKartenzahl(anfangszustand);
+
+      final ende = spielePartieBisEnde(
+        engine: engine,
+        anfangszustand: anfangszustand,
+        bots: bots,
+        botRng: SeedableRng.seeded(seed + 2000),
+      );
+
+      expect(ende.spielLaeuft, isFalse, reason: 'Seed $seed sollte enden');
+      expect(_gesamtKartenzahl(ende), erwarteteKartenzahl, reason: 'Seed $seed');
+      for (final s in ende.spieler) {
+        expect(s.heiligkeit, greaterThanOrEqualTo(0), reason: 'Seed $seed, ${s.id}');
+      }
+    }
+  });
 }

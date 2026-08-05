@@ -24,6 +24,9 @@ class Partieergebnis {
   final int tiefpunktHeiligkeit;
   final Map<Kategorie, int> punkteJeKategorie;
   final Map<Person, int> punkteJePerson;
+  final int fuehrungswechsel; // Spieldynamik: wie oft wechselt die Führung?
+  final List<int> wertungsWerte; // Punkte je Wertungsphase (Spannungskurve)
+  final Map<String, int> gespielteKarten; // Kartenvielfalt
 
   const Partieergebnis({
     required this.seed,
@@ -34,6 +37,9 @@ class Partieergebnis {
     required this.tiefpunktHeiligkeit,
     required this.punkteJeKategorie,
     required this.punkteJePerson,
+    required this.fuehrungswechsel,
+    required this.wertungsWerte,
+    required this.gespielteKarten,
   });
 }
 
@@ -98,6 +104,16 @@ Partieergebnis spielePartieMitMetriken({
   var tiefpunkt = state.spieler.map((s) => s.heiligkeit).reduce(min);
   final kategorieSummen = <Kategorie, int>{};
   final personSummen = <Person, int>{};
+  final wertungsWerte = <int>[];
+  final gespielteKarten = <String, int>{};
+  var fuehrer = state.spieler
+      .reduce((a, b) => a.heiligkeit >= b.heiligkeit ? a : b)
+      .id;
+  var fuehrungswechsel = 0;
+
+  void zaehleKarteGespielt(String karteId) {
+    gespielteKarten.update(karteId, (v) => v + 1, ifAbsent: () => 1);
+  }
 
   for (var i = 0; i < maxCommands; i++) {
     if (!state.spielLaeuft) {
@@ -110,6 +126,9 @@ Partieergebnis spielePartieMitMetriken({
         tiefpunktHeiligkeit: tiefpunkt,
         punkteJeKategorie: kategorieSummen,
         punkteJePerson: personSummen,
+        fuehrungswechsel: fuehrungswechsel,
+        wertungsWerte: wertungsWerte,
+        gespielteKarten: gespielteKarten,
       );
     }
 
@@ -138,13 +157,42 @@ Partieergebnis spielePartieMitMetriken({
     final aktuellesMin = state.spieler.map((s) => s.heiligkeit).reduce(min);
     if (aktuellesMin < tiefpunkt) tiefpunkt = aktuellesMin;
 
+    final aktuellerFuehrer = state.spieler
+        .reduce((a, b) => a.heiligkeit >= b.heiligkeit ? a : b)
+        .id;
+    if (aktuellerFuehrer != fuehrer) {
+      fuehrungswechsel++;
+      fuehrer = aktuellerFuehrer;
+    }
+
     for (final event in events) {
-      if (event is! WertungBerechnet) continue;
-      for (final e in punkteJeKategorie(event.wertung).entries) {
-        kategorieSummen.update(e.key, (v) => v + e.value, ifAbsent: () => e.value);
-      }
-      for (final e in punkteJePerson(event.wertung).entries) {
-        personSummen.update(e.key, (v) => v + e.value, ifAbsent: () => e.value);
+      switch (event) {
+        case KarteGelegt(karteId: final id):
+          zaehleKarteGespielt(id);
+        case GebietErweitert(karteId: final id):
+          zaehleKarteGespielt(id);
+        case EvilGespielt(karteId: final id):
+          zaehleKarteGespielt(id);
+        case SofortGespielt(karteId: final id):
+          zaehleKarteGespielt(id);
+        case WertungBerechnet(wertung: final wertung):
+          wertungsWerte.add(wertung.punkte);
+          for (final e in punkteJeKategorie(wertung).entries) {
+            kategorieSummen.update(
+              e.key,
+              (v) => v + e.value,
+              ifAbsent: () => e.value,
+            );
+          }
+          for (final e in punkteJePerson(wertung).entries) {
+            personSummen.update(
+              e.key,
+              (v) => v + e.value,
+              ifAbsent: () => e.value,
+            );
+          }
+        default:
+          break;
       }
     }
   }
@@ -158,6 +206,9 @@ Partieergebnis spielePartieMitMetriken({
     tiefpunktHeiligkeit: tiefpunkt,
     punkteJeKategorie: kategorieSummen,
     punkteJePerson: personSummen,
+    fuehrungswechsel: fuehrungswechsel,
+    wertungsWerte: wertungsWerte,
+    gespielteKarten: gespielteKarten,
   );
 }
 
@@ -169,6 +220,19 @@ double median(List<int> werte) {
   return (sortiert[mitte - 1] + sortiert[mitte]) / 2;
 }
 
+/// Stichproben-Standardabweichung — Maß für die "Spannungskurve": nahe 0
+/// heißt, jede Wertungsphase bringt fast denselben Punktwert (eintönig),
+/// sehr hoch heißt stark schwankend (evtl. frustrierend swingy).
+double stddev(List<int> werte) {
+  if (werte.length < 2) return 0;
+  final mittel = werte.reduce((a, b) => a + b) / werte.length;
+  final summeQuadrate = werte.fold(
+    0.0,
+    (s, w) => s + (w - mittel) * (w - mittel),
+  );
+  return sqrt(summeQuadrate / (werte.length - 1));
+}
+
 class SammelErgebnis {
   final int anzahlPartien;
   final int abgebrochen;
@@ -177,6 +241,10 @@ class SammelErgebnis {
   final int startspielerSiege;
   final Map<Kategorie, int> kategorieSummen;
   final Map<Person, int> personSummen;
+  final List<int> fuehrungswechsel;
+  final List<int> alleWertungsWerte;
+  final Map<String, int> gespielteKartenGesamt;
+  final int kartenpoolGroesse;
 
   const SammelErgebnis({
     required this.anzahlPartien,
@@ -186,12 +254,31 @@ class SammelErgebnis {
     required this.startspielerSiege,
     required this.kategorieSummen,
     required this.personSummen,
+    required this.fuehrungswechsel,
+    required this.alleWertungsWerte,
+    required this.gespielteKartenGesamt,
+    required this.kartenpoolGroesse,
   });
 
   int get beendet => anzahlPartien - abgebrochen;
   double get medianZuege => median(zuege);
   double get startspielerWinrate => beendet == 0 ? 0 : startspielerSiege / beendet;
   int get minTiefpunkt => tiefpunkte.isEmpty ? 0 : tiefpunkte.reduce(min);
+
+  double get medianFuehrungswechsel => median(fuehrungswechsel);
+  double get wertungsSchwankung => stddev(alleWertungsWerte);
+
+  /// Anteil der Karten aus dem Pool, die in dieser Simulation mindestens
+  /// einmal gespielt wurden — niedrig heißt: die Bots nutzen nur einen
+  /// kleinen Ausschnitt des Kartensets (wenig Vielfalt in der Praxis).
+  double get genutzteKartenvielfalt =>
+      kartenpoolGroesse == 0 ? 0 : gespielteKartenGesamt.length / kartenpoolGroesse;
+
+  List<MapEntry<String, int>> meistgespielteKarten({int top = 10}) {
+    final sortiert = gespielteKartenGesamt.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return sortiert.take(top).toList();
+  }
 
   Map<Kategorie, double> get kategorieAnteile {
     // Nenner ist die Summe der Beträge je Kategorie, nicht der Betrag der
@@ -230,6 +317,9 @@ SammelErgebnis simuliere({
   var abgebrochen = 0;
   final kategorieSummen = <Kategorie, int>{};
   final personSummen = <Person, int>{};
+  final fuehrungswechsel = <int>[];
+  final alleWertungsWerte = <int>[];
+  final gespielteKartenGesamt = <String, int>{};
 
   for (var i = 0; i < anzahlPartien; i++) {
     final seed = startSeed + i * 10;
@@ -242,6 +332,11 @@ SammelErgebnis simuliere({
     );
     zuege.add(ergebnis.zuege);
     tiefpunkte.add(ergebnis.tiefpunktHeiligkeit);
+    fuehrungswechsel.add(ergebnis.fuehrungswechsel);
+    alleWertungsWerte.addAll(ergebnis.wertungsWerte);
+    for (final e in ergebnis.gespielteKarten.entries) {
+      gespielteKartenGesamt.update(e.key, (v) => v + e.value, ifAbsent: () => e.value);
+    }
     if (ergebnis.abgebrochen) {
       abgebrochen++;
       continue;
@@ -258,6 +353,10 @@ SammelErgebnis simuliere({
   return SammelErgebnis(
     anzahlPartien: anzahlPartien,
     abgebrochen: abgebrochen,
+    fuehrungswechsel: fuehrungswechsel,
+    alleWertungsWerte: alleWertungsWerte,
+    gespielteKartenGesamt: gespielteKartenGesamt,
+    kartenpoolGroesse: kartenpool.length,
     zuege: zuege,
     tiefpunkte: tiefpunkte,
     startspielerSiege: startspielerSiege,
