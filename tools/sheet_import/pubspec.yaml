@@ -1,0 +1,15 @@
+name: sheet_import
+description: Konvertiert den Kartendaten-Rohexport nach data/sets/*.json (KARTEN_SPEZIFIKATION §6).
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.7.2
+
+dependencies:
+  btcg_engine:
+    path: ../../engine
+
+dev_dependencies:
+  lints: ^5.0.0
+  test: ^1.24.0
