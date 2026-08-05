@@ -13,6 +13,7 @@ export 'rules/commands.dart';
 export 'rules/effekt_wahl.dart';
 export 'rules/events.dart';
 export 'rules/regel_verstoss.dart';
+export 'rules/sichtbarkeit.dart';
 export 'rules/spiel_aufbau.dart';
 export 'rules/wertung.dart';
 

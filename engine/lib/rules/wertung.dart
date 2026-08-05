@@ -1,4 +1,5 @@
 import '../model/model.dart';
+import 'sichtbarkeit.dart';
 
 /// Wertung einer einzelnen Slot-Spalte in einem Spielfeld.
 class SlotWertung {
@@ -40,19 +41,6 @@ class Wertung {
       felder.fold(0, (summe, f) => summe + f.punkte) + globalerZuschlag;
 }
 
-/// Findet für [feld]/[pos] die sichtbare Karte: schaut von oben durch Löcher,
-/// bis ein Nicht-Loch-Symbol auftaucht oder der Stapel endet (dann null).
-({SlotSymbol symbol, int tiefe})? _sichtbaresSymbol(
-  Spielfeld feld,
-  SlotPosition pos,
-) {
-  for (var tiefe = 0; tiefe < feld.stapel.length; tiefe++) {
-    final symbol = feld.stapel[tiefe].karte.slotAn(pos);
-    if (symbol is! Loch) return (symbol: symbol, tiefe: tiefe);
-  }
-  return null; // Stapel besteht bis zum Ende nur aus Löchern (oder ist leer)
-}
-
 bool _umkehrungAktiv(Spielfeld feld, SlotPosition pos) {
   final oben = feld.oberste?.karte;
   final effekt = oben?.effekt;
@@ -81,7 +69,7 @@ Wertung berechneWertung(GameState state, String spielerId) {
     final slotWertungen = <SlotWertung>[];
 
     for (final pos in kSlotOrder) {
-      final gefunden = _sichtbaresSymbol(feld, pos);
+      final gefunden = sichtbaresSymbolAn(feld, pos);
       if (gefunden == null) {
         slotWertungen.add(SlotWertung(slot: pos, tiefe: 0, punkte: 0));
         continue;
