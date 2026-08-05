@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../bloc/game_bloc.dart';
-import '../../data/deckbau.dart';
 import '../../data/kartenset_loader.dart';
 import 'spiel_screen.dart';
 
@@ -27,13 +26,13 @@ class _StartScreenState extends State<StartScreen> {
         id: 'p1',
         name: 'Spieler 1',
         alleKarten: kartenset.alleKarten,
-        random: Random(seed),
+        seed: seed,
       ),
       baueZufaelligesDeck(
         id: 'p2',
         name: 'Spieler 2',
         alleKarten: kartenset.alleKarten,
-        random: Random(seed + 1),
+        seed: seed + 1,
       ),
     ];
     final anfangszustand = neuesSpiel(spieler: aufbau, seed: seed);

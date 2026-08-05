@@ -6,11 +6,13 @@ class SlotWertung {
   final SlotPosition slot;
   final int tiefe; // Anzahl durchschauter Löcher; 0 = oberste Karte
   final int punkte;
+  final Karte? quellKarte; // Karte, deren Symbol sichtbar war (null = Loch bis zum Ende)
 
   const SlotWertung({
     required this.slot,
     required this.tiefe,
     required this.punkte,
+    this.quellKarte,
   });
 }
 
@@ -39,6 +41,41 @@ class Wertung {
 
   int get punkte =>
       felder.fold(0, (summe, f) => summe + f.punkte) + globalerZuschlag;
+}
+
+/// Punktebeitrag je Kategorie (ROADMAP Phase 1b — Dominanz-Erkennung,
+/// Zielwert: keine Kategorie > ~35 % des Gesamtbeitrags).
+Map<Kategorie, int> punkteJeKategorie(Wertung wertung) {
+  final ergebnis = <Kategorie, int>{};
+  for (final feld in wertung.felder) {
+    for (final slot in feld.slots) {
+      final karte = slot.quellKarte;
+      if (karte == null || slot.punkte == 0) continue;
+      ergebnis.update(
+        karte.kategorie,
+        (v) => v + slot.punkte,
+        ifAbsent: () => slot.punkte,
+      );
+    }
+  }
+  return ergebnis;
+}
+
+/// Punktebeitrag je Person (Vater/Sohn/Hl. Geist), gleiche Zielsetzung.
+Map<Person, int> punkteJePerson(Wertung wertung) {
+  final ergebnis = <Person, int>{};
+  for (final feld in wertung.felder) {
+    for (final slot in feld.slots) {
+      if (slot.punkte == 0) continue;
+      final person = personVon(slot.slot);
+      ergebnis.update(
+        person,
+        (v) => v + slot.punkte,
+        ifAbsent: () => slot.punkte,
+      );
+    }
+  }
+  return ergebnis;
 }
 
 bool _umkehrungAktiv(Spielfeld feld, SlotPosition pos) {
@@ -84,7 +121,10 @@ Wertung berechneWertung(GameState state, String spielerId) {
         case Loch():
           punkte = 0; // unerreichbar, _sichtbaresSymbol liefert nie Loch
       }
-      slotWertungen.add(SlotWertung(slot: pos, tiefe: tiefe, punkte: punkte));
+      final quellKarte = feld.stapel[tiefe].karte;
+      slotWertungen.add(
+        SlotWertung(slot: pos, tiefe: tiefe, punkte: punkte, quellKarte: quellKarte),
+      );
     }
 
     felder.add(FeldWertung(feldIndex: feldIndex, slots: slotWertungen));

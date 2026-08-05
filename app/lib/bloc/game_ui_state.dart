@@ -1,7 +1,5 @@
 import 'package:btcg_engine/engine.dart';
 
-import '../data/kartenset_loader.dart';
-
 /// UI-Zustand, den [GameBloc] hält: der reine Engine-[GameState] plus
 /// ephemere UI-Auswahl (ARCHITEKTUR §3 — "Keine Spiellogik im Bloc").
 class GameUiState {

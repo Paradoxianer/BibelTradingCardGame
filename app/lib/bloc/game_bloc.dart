@@ -1,7 +1,6 @@
 import 'package:btcg_engine/engine.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../data/kartenset_loader.dart';
 import 'game_event.dart';
 import 'game_ui_state.dart';
 

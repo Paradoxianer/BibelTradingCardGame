@@ -109,5 +109,21 @@ void main() {
       expect(berechneWertung(state, 'p1').punkte, 1);
       expect(berechneWertung(state, 'p2').punkte, 1);
     });
+
+    test('Punktebeitrag je Kategorie und Person wird korrekt zugeordnet', () {
+      final gebet = testKarte('g1', ['2', '0', '0', '0', '0', '0'], kategorie: Kategorie.gebet);
+      final glauben = testKarte('l1', ['x', '0', '0', '0', '0', '0'], kategorie: Kategorie.glauben);
+      final feld = testFeld([glauben, gebet]);
+      final s = testSpieler('p1', spielfelder: [feld, const Spielfeld(), const Spielfeld()]);
+      final wertung = berechneWertung(testState([s]), 'p1');
+
+      final jeKategorie = punkteJeKategorie(wertung);
+      expect(jeKategorie[Kategorie.gebet], 2);
+      expect(jeKategorie.containsKey(Kategorie.glauben), isFalse); // 0 Punkte, nicht gezählt
+
+      final jePerson = punkteJePerson(wertung);
+      expect(jePerson[Person.vater], 2);
+      expect(jePerson.containsKey(Person.sohn), isFalse);
+    });
   });
 }
