@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../bloc/game_bloc.dart';
 import '../../data/kartenset_loader.dart';
+import 'onboarding_screen.dart';
 import 'spiel_screen.dart';
 
 class StartScreen extends StatefulWidget {
@@ -57,9 +58,28 @@ class _StartScreenState extends State<StartScreen> {
     );
   }
 
+  void _regelnZeigen(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => OnboardingScreen(
+          onFertig: () => Navigator.of(context).pop(),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        // Bewusst als leading statt trailing action: der rechte Rand
+        // überlappt sich im Debug-Build mit Flutters Debug-Banner.
+        leading: IconButton(
+          onPressed: () => _regelnZeigen(context),
+          icon: const Icon(Icons.help_outline),
+          tooltip: 'Wie spielt man?',
+        ),
+      ),
       body: Center(
         child: FutureBuilder<Kartenset>(
           future: _kartenset,
