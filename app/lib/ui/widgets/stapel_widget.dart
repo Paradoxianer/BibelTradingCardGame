@@ -13,12 +13,22 @@ class StapelWidget extends StatelessWidget {
   final bool hervorgehoben;
   final VoidCallback? onTap;
 
+  /// Punkte, die dieses Feld aktuell pro Runde einbringt. `null` blendet die
+  /// Anzeige aus (z. B. beim Onboarding-Demo-Stapel).
+  final int? punkte;
+
+  /// Karte, die gerade über dem Feld schwebt (Drag&Drop). Zeigt dann die
+  /// Vorschau, wie sich [punkte] beim Ablegen ändern würde.
+  final Karte? vorschauKarte;
+
   const StapelWidget({
     super.key,
     required this.feld,
     this.ausgewaehlt = false,
     this.hervorgehoben = false,
     this.onTap,
+    this.punkte,
+    this.vorschauKarte,
   });
 
   @override
@@ -45,6 +55,15 @@ class StapelWidget extends StatelessWidget {
             _SlotZeile(feld: feld),
             const SizedBox(height: 4),
             _KartenkoerperGestapelt(feld: feld),
+            if (punkte != null) ...[
+              const SizedBox(height: 4),
+              _PunkteAnzeige(
+                punkte: punkte!,
+                nachher: vorschauKarte == null
+                    ? null
+                    : werteFeld(feld.legeObenauf(vorschauKarte!), 0).punkte,
+              ),
+            ],
           ],
         ),
       ),
@@ -73,6 +92,60 @@ class _SlotZeile extends StatelessWidget {
         ),
         child: SlotZeile.fuerFeld(feld),
       ),
+    );
+  }
+}
+
+/// Punkte pro Runde für ein Feld. Liegt eine Karte im Drag über dem Feld,
+/// wird zusätzlich gezeigt, worauf der Wert beim Ablegen springen würde.
+class _PunkteAnzeige extends StatelessWidget {
+  final int punkte;
+  final int? nachher;
+
+  const _PunkteAnzeige({required this.punkte, this.nachher});
+
+  static Color _farbe(int wert) => switch (wert) {
+    > 0 => Colors.green.shade700,
+    < 0 => Colors.red.shade700,
+    _ => Colors.grey.shade600,
+  };
+
+  static String _mitVorzeichen(int wert) => wert > 0 ? '+$wert' : '$wert';
+
+  @override
+  Widget build(BuildContext context) {
+    const stil = TextStyle(fontSize: 12, fontWeight: FontWeight.bold);
+    if (nachher == null) {
+      return Text(
+        _mitVorzeichen(punkte),
+        style: stil.copyWith(color: _farbe(punkte)),
+      );
+    }
+    final differenz = nachher! - punkte;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          _mitVorzeichen(punkte),
+          style: stil.copyWith(
+            color: Colors.grey,
+            decoration: TextDecoration.lineThrough,
+          ),
+        ),
+        const Text('  →  ', style: TextStyle(fontSize: 11, color: Colors.grey)),
+        Text(
+          _mitVorzeichen(nachher!),
+          style: stil.copyWith(color: _farbe(nachher!)),
+        ),
+        Text(
+          ' (${_mitVorzeichen(differenz)})',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: _farbe(differenz),
+          ),
+        ),
+      ],
     );
   }
 }

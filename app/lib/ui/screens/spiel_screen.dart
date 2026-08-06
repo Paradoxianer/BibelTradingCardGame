@@ -80,6 +80,7 @@ class _SpielBrett extends StatelessWidget {
           for (final gegner in andere)
             _GegnerZeile(
               spieler: gegner,
+              evilPhase: spiel.phase == ZugPhase.evilSpielen,
               evilKarteAusgewaehlt: spiel.phase == ZugPhase.evilSpielen &&
                   state.ausgewaehlteHandkarte != null,
               onFeldTap: (feldIndex) => bloc.add(
@@ -95,9 +96,11 @@ class _SpielBrett extends StatelessWidget {
                 alignment: WrapAlignment.center,
                 children: [
                   for (var i = 0; i < aktiver.spielfelder.length; i++)
-                    StapelWidget(
+                    _EigenesFeld(
+                      key: ValueKey('eigenes-feld-$i'),
                       feld: aktiver.spielfelder[i],
-                      onTap: () => bloc.add(FeldAngetippt(i)),
+                      feldIndex: i,
+                      bauenMoeglich: spiel.phase == ZugPhase.bauen,
                     ),
                 ],
               ),
@@ -115,14 +118,52 @@ class _SpielBrett extends StatelessWidget {
   }
 }
 
+/// Eigenes Spielfeld: antippbar wie bisher und zusätzlich Drag-Ziel.
+/// Die Legalität entscheidet weiterhin allein der Bloc — die Prüfung hier
+/// steuert nur, ob das Feld optisch als Ziel reagiert.
+class _EigenesFeld extends StatelessWidget {
+  final Spielfeld feld;
+  final int feldIndex;
+  final bool bauenMoeglich;
+
+  const _EigenesFeld({
+    super.key,
+    required this.feld,
+    required this.feldIndex,
+    required this.bauenMoeglich,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bloc = context.read<GameBloc>();
+    return DragTarget<Karte>(
+      onWillAcceptWithDetails: (details) =>
+          bauenMoeglich && details.data.kategorie != Kategorie.evil,
+      onAcceptWithDetails: (details) {
+        bloc.add(HandkarteAngetippt(details.data));
+        bloc.add(FeldAngetippt(feldIndex));
+      },
+      builder: (context, kandidaten, _) => StapelWidget(
+        feld: feld,
+        ausgewaehlt: kandidaten.isNotEmpty,
+        punkte: werteFeld(feld, feldIndex).punkte,
+        vorschauKarte: kandidaten.isEmpty ? null : kandidaten.first,
+        onTap: () => bloc.add(FeldAngetippt(feldIndex)),
+      ),
+    );
+  }
+}
+
 class _GegnerZeile extends StatelessWidget {
   final Spieler spieler;
   final bool evilKarteAusgewaehlt;
+  final bool evilPhase;
   final void Function(int feldIndex) onFeldTap;
 
   const _GegnerZeile({
     required this.spieler,
     required this.evilKarteAusgewaehlt,
+    required this.evilPhase,
     required this.onFeldTap,
   });
 
@@ -145,10 +186,23 @@ class _GegnerZeile extends StatelessWidget {
                 for (var i = 0; i < spieler.spielfelder.length; i++)
                   Transform.scale(
                     scale: 0.7,
-                    child: StapelWidget(
-                      feld: spieler.spielfelder[i],
-                      hervorgehoben: evilKarteAusgewaehlt,
-                      onTap: evilKarteAusgewaehlt ? () => onFeldTap(i) : null,
+                    child: DragTarget<Karte>(
+                      onWillAcceptWithDetails: (details) =>
+                          evilPhase && details.data.kategorie == Kategorie.evil,
+                      onAcceptWithDetails: (details) {
+                        context.read<GameBloc>().add(
+                          HandkarteAngetippt(details.data),
+                        );
+                        onFeldTap(i);
+                      },
+                      builder: (context, kandidaten, _) => StapelWidget(
+                        feld: spieler.spielfelder[i],
+                        hervorgehoben:
+                            evilKarteAusgewaehlt || kandidaten.isNotEmpty,
+                        onTap: evilKarteAusgewaehlt
+                            ? () => onFeldTap(i)
+                            : null,
+                      ),
                     ),
                   ),
               ],
@@ -250,14 +304,33 @@ class _HandLeiste extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         children: [
           for (final karte in hand)
-            HandkarteWidget(
-              karte: karte,
-              ausgewaehlt: karte.id == state.ausgewaehlteHandkarte?.id,
-              spielbar:
-                  (phase == ZugPhase.bauen && karte.kategorie != Kategorie.evil) ||
-                  (phase == ZugPhase.evilSpielen && karte.kategorie == Kategorie.evil),
-              onTap: () =>
-                  context.read<GameBloc>().add(HandkarteAngetippt(karte)),
+            Builder(
+              builder: (context) {
+                final spielbar =
+                    (phase == ZugPhase.bauen &&
+                        karte.kategorie != Kategorie.evil) ||
+                    (phase == ZugPhase.evilSpielen &&
+                        karte.kategorie == Kategorie.evil);
+                final widget = HandkarteWidget(
+                  karte: karte,
+                  ausgewaehlt: karte.id == state.ausgewaehlteHandkarte?.id,
+                  spielbar: spielbar,
+                  onTap: () =>
+                      context.read<GameBloc>().add(HandkarteAngetippt(karte)),
+                );
+                if (!spielbar) return widget;
+                // Ziehen ist die zweite Bedienart neben Antippen — beide
+                // lösen dieselben Bloc-Events aus.
+                return Draggable<Karte>(
+                  data: karte,
+                  feedback: Material(
+                    color: Colors.transparent,
+                    child: Transform.scale(scale: 1.1, child: widget),
+                  ),
+                  childWhenDragging: Opacity(opacity: 0.3, child: widget),
+                  child: widget,
+                );
+              },
             ),
         ],
       ),
