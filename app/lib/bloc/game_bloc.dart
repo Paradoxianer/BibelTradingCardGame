@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:btcg_engine/bots/bots.dart';
 import 'package:btcg_engine/engine.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydrated_bloc/hydrated_bloc.dart';
 
 import 'game_event.dart';
 import 'game_ui_state.dart';
+import 'spiel_persistenz.dart';
 
 /// Übersetzt UI-Intents in Engine-[Command]s und Engine-[GameEvent]s zurück
 /// in UI-Zustand (ARCHITEKTUR §3). Enthält selbst keine Spielregeln — jede
@@ -13,19 +16,53 @@ import 'game_ui_state.dart';
 /// Ist ein Bot am Zug (Bauen/Evil/Reaktion), spielt [GameBloc] ihn
 /// automatisch weiter, bis wieder ein Mensch entscheiden muss oder die
 /// Partie endet — dafür gibt es keinen eigenen Übergabe-Screen.
-class GameBloc extends Bloc<GameUiEvent, GameUiState> {
+///
+/// Persistiert sich selbst über [HydratedBloc]: siehe spiel_persistenz.dart
+/// für die Seed+Verlauf-Serialisierung. [GameBloc.storageToken] ist der
+/// Schlüssel, unter dem der Spielstand liegt — [loescheGespeichertesSpiel]
+/// und [gespeichertesSpielVorhanden] arbeiten direkt darauf, ohne dass schon
+/// eine Instanz existieren muss.
+class GameBloc extends HydratedBloc<GameUiEvent, GameUiState> {
+  /// Muss mit dem von [HydratedMixin] intern berechneten `storageToken`
+  /// übereinstimmen (Klassenname, da `id`/`storagePrefix` nicht überschrieben
+  /// sind) — hier als Konstante, damit nichts an zwei Stellen gepflegt wird.
+  static const String speicherSchluessel = 'GameBloc';
+
+  static bool gespeichertesSpielVorhanden() =>
+      HydratedBloc.storage.read(speicherSchluessel) != null;
+
+  static Future<void> loescheGespeichertesSpiel() =>
+      HydratedBloc.storage.delete(speicherSchluessel);
+
   final GameEngine _engine = GameEngine();
+  final Kartenset kartenset;
+  final List<SpielerAufbau> _aufbauListe;
+  final int _seed;
+  final RegelConfig _config;
   final Map<String, Bot> _botSpieler;
+  final int _anfangsBotSeed;
   SeedableRng _botRng;
+  final List<Command> _verlauf = [];
 
   GameBloc({
-    required GameState anfangszustand,
-    required Kartenset kartenset,
+    required this.kartenset,
+    required List<SpielerAufbau> aufbauListe,
+    required int seed,
+    RegelConfig config = const RegelConfig(),
     Map<String, Bot> botSpieler = const {},
     int botSeed = 0,
-  }) : _botSpieler = botSpieler,
+  }) : _aufbauListe = aufbauListe,
+       _seed = seed,
+       _config = config,
+       _botSpieler = botSpieler,
+       _anfangsBotSeed = botSeed,
        _botRng = SeedableRng.seeded(botSeed),
-       super(GameUiState(spiel: anfangszustand, kartenset: kartenset)) {
+       super(
+         GameUiState(
+           spiel: neuesSpiel(spieler: aufbauListe, seed: seed, config: config),
+           kartenset: kartenset,
+         ),
+       ) {
     on<HandkarteAngetippt>(_aufHandkarteAngetippt);
     on<FeldAngetippt>(_aufFeldAngetippt);
     on<EvilZielAngetippt>(_aufEvilZielAngetippt);
@@ -34,6 +71,40 @@ class GameBloc extends Bloc<GameUiEvent, GameUiState> {
     on<UebergabeBestaetigt>(_aufUebergabeBestaetigt);
     on<BotZugAusloesen>(_aufBotZugAusloesen);
     add(const BotZugAusloesen());
+  }
+
+  @override
+  Map<String, dynamic>? toJson(GameUiState uiState) {
+    if (!uiState.spiel.spielLaeuft) return null; // beendete Partie nicht persistieren
+    return gespeichertePartieZuJson(
+      kartenset: kartenset,
+      aufbauListe: _aufbauListe,
+      seed: _seed,
+      config: _config,
+      botSpieler: _botSpieler,
+      botSeed: _anfangsBotSeed,
+      verlauf: _verlauf,
+    );
+  }
+
+  @override
+  GameUiState? fromJson(Map<String, dynamic> json) {
+    final partie = parseGespeichertePartie(json, kartenset);
+    if (partie == null) return null;
+
+    var zustand = neuesSpiel(
+      spieler: partie.aufbauListe,
+      seed: partie.seed,
+      config: partie.config,
+    );
+    _verlauf.clear();
+    for (final command in partie.verlauf) {
+      final (neu, _) = _engine.apply(zustand, command);
+      zustand = neu;
+      _verlauf.add(command);
+    }
+
+    return GameUiState(spiel: zustand, kartenset: kartenset);
   }
 
   String _verantwortlicherId(GameState s) =>
@@ -56,6 +127,7 @@ class GameBloc extends Bloc<GameUiEvent, GameUiState> {
         _botRng,
       );
       _botRng = neuerRng;
+      _verlauf.add(command);
       final (neuerState, neueEvents) = _engine.apply(aktuellerState, command);
       aktuellerState = neuerState;
       alleEvents.addAll(neueEvents);
@@ -66,6 +138,7 @@ class GameBloc extends Bloc<GameUiEvent, GameUiState> {
   void _anwenden(Emitter<GameUiState> emit, Command command) {
     try {
       final (nachMenschenzug, eventsMensch) = _engine.apply(state.spiel, command);
+      _verlauf.add(command);
       final (neu, events) = _spieleBotsWeiter(nachMenschenzug, eventsMensch);
       final zugWurdeBeendet = events.any((e) => e is ZugBeendet);
       final wertung = events.whereType<WertungBerechnet>().lastOrNull?.wertung;
@@ -81,6 +154,7 @@ class GameBloc extends Bloc<GameUiEvent, GameUiState> {
           fehler: null,
         ),
       );
+      if (!neu.spielLaeuft) unawaited(clear());
     } on RegelVerstoss catch (e) {
       emit(state.copyWith(fehler: e.nachricht));
     }
@@ -98,6 +172,7 @@ class GameBloc extends Bloc<GameUiEvent, GameUiState> {
         letzteWertung: wertung ?? state.letzteWertung,
       ),
     );
+    if (!neu.spielLaeuft) unawaited(clear());
   }
 
   void _aufHandkarteAngetippt(

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hydrated_bloc/hydrated_bloc.dart';
 
 import 'package:btcg_app/main.dart';
+
+import 'test_storage.dart';
 
 /// rootBundle.loadString() ist echte Async-I/O und braucht echte Wall-Clock-
 /// Zeit, die die Fake-Async-Zone von testWidgets nicht von selbst voran-
@@ -15,6 +18,10 @@ Future<void> _kartendatenAbwarten(WidgetTester tester) async {
 }
 
 void main() {
+  setUp(() {
+    HydratedBloc.storage = SpeicherImArbeitsspeicher();
+  });
+
   testWidgets('Onboarding zeigt die erste Seite, dann Startscreen nach Überspringen', (
     WidgetTester tester,
   ) async {
