@@ -244,7 +244,7 @@ class _HandLeiste extends StatelessWidget {
   Widget build(BuildContext context) {
     final phase = state.spiel.phase;
     return SizedBox(
-      height: 128,
+      height: 144,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

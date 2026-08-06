@@ -4,6 +4,23 @@
 > reine, UI-freie Dart-Bibliothek.** Flutter ist nur eine von mehreren
 > Oberflächen darüber (App, Simulator, später Server).
 
+## 0. Qualitätsanspruch (verbindlich)
+
+Das Spiel soll **junge Menschen für den christlichen Glauben begeistern**.
+Daraus folgt ein Anspruch, der über „funktioniert" hinausgeht: Darstellung,
+Kartenlayout und Animationen müssen **Oberklasse** sein — auf dem Niveau
+kommerzieller Sammelkartenspiele. Der Bibelvers ist dabei kein Beiwerk,
+sondern trägt den Inhalt und gehört entsprechend prominent aufs Kartenlayout.
+
+Praktische Konsequenzen für die Implementierung:
+
+- Visuelle Entscheidungen werden **nicht geraten**. Referenz sind die
+  Original-Tiles in `legacy/ArtWork/` und die Kartenentwürfe — im Zweifel
+  am Asset nachmessen, nicht aus dem Namen einer Datei schließen.
+- Ein „technisch korrektes", aber unleserliches oder unschönes Rendering
+  gilt als Fehler, nicht als erledigt.
+- Neue UI wird im echten Browser angesehen, bevor sie als fertig gilt.
+
 ## 1. Repository-Layout
 
 ```
@@ -79,12 +96,49 @@ der Engine als geparste Objekte übergeben; Laden/Parsen macht die App bzw. das 
   (GreedyBot) steht als Solo-Modus zur Verfügung — kein Übergabe-Screen
   nötig, der Bot zieht automatisch, sobald er an der Reihe ist.
 - **Kern-UI-Herausforderung — Loch-Darstellung:** Der Stapel wird als *eine*
-  zusammengesetzte Karte gerendert: pro Slot wird das oberste nicht-Loch-Symbol
-  angezeigt, mit Tiefen-Hinweis (z. B. leichter Versatz/Schatten der
-  darunterliegenden Kartenränder). Beim Legen einer Karte animiert das
-  „Durchscheinen" (Symbole der unteren Karte erscheinen in den Löchern).
-  Das ist das visuelle Alleinstellungsmerkmal — hierfür früh einen
-  UI-Prototyp bauen und testen.
+  zusammengesetzte Karte gerendert, mit Tiefen-Hinweis (leichter
+  Versatz/Schatten der darunterliegenden Kartenränder). Beim Legen einer
+  Karte animiert das „Durchscheinen". Das ist das visuelle
+  Alleinstellungsmerkmal.
+
+  **Verbindliche Regeln der Slot-Darstellung** (aus den Original-Tiles
+  abgeleitet, nicht verhandelbar):
+
+  1. Es sind **immer genau 6 Symbolzellen sichtbar** — nie Lücken. Eine
+     Spalte, in der nichts zu sehen ist, ist ein Rendering-Fehler.
+  2. Pro Spalte wird **eine** Zelle gezeichnet: das erste Nicht-Loch-Symbol
+     von oben (`sichtbaresSymbolAn`, dieselbe Logik wie die Wertung, damit
+     Bild und Punkte nie auseinanderlaufen).
+  3. Wurde dabei durch **mindestens ein Loch** geschaut, liegt zusätzlich der
+     **„zählt"-Marker** darüber: je ein Dreieck oben und unten. Ohne ihn ist
+     die Loch-Mechanik für Spielende unsichtbar und das Onboarding wirkt
+     widersprüchlich (bunter Wert sieht dann genauso aus, ob er zählt oder
+     nicht).
+  4. Ist eine Spalte über die **gesamte** Stapeltiefe Loch, wird das volle
+     Loch-Tile gezeigt (Loch ohne etwas dahinter).
+
+  **Bedeutung der Dreiecke** (aus den Original-Tiles abgelesen): Sie stehen
+  für „dieser Wert zählt". Im Bestand tragen sie genau die beiden Symbole,
+  die zählen — `-1` (zählt immer, sobald sichtbar) und `x` (das Loch, das
+  das Zählen überhaupt ermöglicht). Die bunten Werte `0/1/2` haben sie
+  **nicht**, weil sie nur durch ein Loch zählen; sie bekommen die Dreiecke
+  deshalb zur Laufzeit genau dann als Overlay, wenn durch ein Loch auf sie
+  geschaut wird. Prüfbar über die Bounding-Box: Tiles mit Dreiecken reichen
+  über die volle Kachelhöhe (y = 0…378), reine Wertkreise nur y = 46…334.
+
+  Gestaltung des Markers: **nicht pixelgenau festgelegt.** Maßgeblich ist,
+  dass alle Tiles **dieselbe Designsprache** haben (gleiche Kreisgröße und
+  -position, damit die Spalten sauber untereinanderstehen) und dass klar
+  erkennbar ist, **welcher Wert zählt**. Die Dreiecke dürfen dafür gerne
+  größer und markanter sein als im Original-Tile.
+
+  Asset-Hinweise: `Empty.png`, `V_x.png`, `S_x.png`, `HG_x.png` sind
+  **byte-identisch** — es gibt genau ein Loch-Tile, personenunabhängig
+  (ebenso sind `Evil.png` und die drei `*_-1.png` identisch). Das Loch-Tile
+  ist **opak** (weiße Fläche mit Schraffur), taugt also nicht als Overlay;
+  dafür braucht es einen separaten Marker mit transparenter Innenfläche.
+  Orientierungsmaße aus dem Bestand (378×378): Kreis Ø ≈ 287 px, vertikal
+  wie die Wert-Tiles zentriert; Dreiecke oben und unten, Spitze zum Ring hin.
 - Persistenz lokaler Spielstände: `HydratedBloc` (bekanntes Muster), kein
   Backend in Phase 1.
 
@@ -112,6 +166,23 @@ Erhobene Metriken (Akzeptanzkriterien in ROADMAP.md):
   Tausch nur für registrierte Konten.
 - Die heutige Engine-Reinheit (deterministisch, Command-basiert) macht den
   Server-Einsatz ohne Umbau möglich — deshalb wird sie jetzt so gebaut.
+- **Verborgene Information und Wertung gehören auf den Server.** Im
+  Hotseat-Modus liegt der vollständige `GameState` im Client, das ist dort
+  unkritisch. Online gilt: der Client ist nicht vertrauenswürdig.
+
+  Serverseitig gehalten und berechnet werden müssen:
+
+  1. **Verdeckte Information** — Deckreihenfolge, fremde Handkarten. Sonst
+     lässt sie sich aus dem Client auslesen.
+  2. **Die Slot-Werte der Karten** (`x`, `-1`, `0`, `1`, `2`). Ein
+     manipulierter Client darf seinen Karten keine besseren Werte andichten
+     können.
+  3. **Die daraus resultierende Wertung** (Heiligkeits-Änderung pro Zug).
+     Der Client zeigt Punkte nur an, er ermittelt sie nicht verbindlich.
+
+  Der Server hält den autoritativen Zustand, schickt jedem Client nur dessen
+  Sicht und prüft jeden Command auf Legalität. Beim Entwurf des
+  Netzwerkprotokolls ist das die Leitfrage — nachträglich nicht reparierbar.
 
 ## 6. Teststrategie
 

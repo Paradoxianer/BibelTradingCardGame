@@ -1,34 +1,12 @@
 import 'package:btcg_engine/engine.dart';
 import 'package:flutter/material.dart';
 
-// Kopie von legacy/ArtWork/ — siehe Kommentar in data/kartenset_loader.dart
-// zum Grund (DWDS unterstützt keine `..`-relativen Assets).
-const String _artworkBasis = 'assets/artwork';
-
-String _prefixFuer(SlotPosition pos) => switch (pos) {
-  SlotPosition.v1 || SlotPosition.v2 => 'V',
-  SlotPosition.s1 || SlotPosition.s2 => 'S',
-  SlotPosition.hg1 || SlotPosition.hg2 => 'HG',
-};
-
-/// Bildpfad für den aktuell sichtbaren Slot-Wert — dieselbe "Durchschau"-
-/// Logik wie die Wertung (engine/rules/sichtbarkeit.dart), damit UI und
-/// Punkte immer zueinander passen.
-String tilePfad(SlotPosition pos, ({SlotSymbol symbol, int tiefe})? gefunden) {
-  if (gefunden == null) return '$_artworkBasis/Empty.png';
-  final prefix = _prefixFuer(pos);
-  final wert = switch (gefunden.symbol) {
-    Farbig(wert: final w) => '$w',
-    Schwarz() => '-1',
-    Loch() => throw StateError('sichtbaresSymbolAn liefert nie ein Loch'),
-  };
-  return '$_artworkBasis/${prefix}_$wert.png';
-}
+import 'slot_zeile.dart';
 
 /// Rendert ein Spielfeld als eine zusammengesetzte Karte: pro Slot das
-/// oberste nicht-Loch-Symbol, mit Tiefen-Hinweis (gestapelte Kartenränder)
-/// und Durchschein-Animation beim Auflegen einer neuen Karte
-/// (ARCHITEKTUR §3 — wichtigster UI-Baustein).
+/// oberste nicht-Loch-Symbol (via [SlotZeile.fuerFeld]), mit Tiefen-Hinweis
+/// (gestapelte Kartenränder) und Durchschein-Animation beim Auflegen einer
+/// neuen Karte (ARCHITEKTUR §3 — wichtigster UI-Baustein).
 class StapelWidget extends StatelessWidget {
   final Spielfeld feld;
   final bool ausgewaehlt;
@@ -89,22 +67,11 @@ class _SlotZeile extends StatelessWidget {
           child: child,
         ),
       ),
-      child: Row(
+      child: KeyedSubtree(
         key: ValueKey(
           '${feld.oberste?.karte.id ?? 'leer'}-${feld.stapel.length}',
         ),
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final pos in kSlotOrder)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 1),
-              child: Image.asset(
-                tilePfad(pos, sichtbaresSymbolAn(feld, pos)),
-                width: 26,
-                height: 26,
-              ),
-            ),
-        ],
+        child: SlotZeile.fuerFeld(feld),
       ),
     );
   }

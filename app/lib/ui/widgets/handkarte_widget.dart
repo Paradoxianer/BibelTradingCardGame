@@ -1,8 +1,10 @@
 import 'package:btcg_engine/engine.dart';
 import 'package:flutter/material.dart';
 
-/// Einzelne Handkarte: Name, Kategorie, Slot-Zeile (unverdeckt, da eigene
-/// Hand). Farblich markiert, wenn ausgewählt oder gerade nicht spielbar.
+import 'slot_zeile.dart';
+
+/// Einzelne Handkarte: Name, Slot-Zeile, Kategorie. Nutzt dieselbe
+/// [SlotZeile] wie die Feldkarten — ein Rendering für beides.
 class HandkarteWidget extends StatelessWidget {
   final Karte karte;
   final bool ausgewaehlt;
@@ -24,8 +26,8 @@ class HandkarteWidget extends StatelessWidget {
       child: GestureDetector(
         onTap: spielbar ? onTap : null,
         child: Container(
-          width: 92,
-          height: 120,
+          width: 118,
+          height: 136,
           margin: const EdgeInsets.symmetric(horizontal: 3),
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
@@ -44,9 +46,11 @@ class HandkarteWidget extends StatelessWidget {
               Text(
                 karte.name,
                 style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                maxLines: 3,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
+              const SizedBox(height: 4),
+              SlotZeile.fuerKarte(karte, groesse: 14),
               const Spacer(),
               Text(
                 karte.kategorie.name,
