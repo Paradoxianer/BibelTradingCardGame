@@ -23,21 +23,25 @@ class LochStanzung extends CustomClipper<Path> {
 
   @override
   Path getClip(Size size) {
-    final karte = Path()..addRRect(
-      RRect.fromRectAndRadius(
-        Offset.zero & size,
-        Radius.circular(eckenRadius),
-      ),
-    );
-    if (loecher.isEmpty) return karte;
-
-    final stanzungen = Path();
+    // `PathFillType.evenOdd` statt `Path.combine(difference)`: Letzteres ist
+    // eine Skia-Pfadoperation und hat im Web-Build nicht gestanzt (im Test
+    // dagegen schon — der Fehler war nur live zu sehen). Die Füllregel ist
+    // dagegen überall dieselbe: eine Fläche, die von zwei Konturen umschlossen
+    // wird, zählt als außerhalb — genau das macht aus dem Kreis ein Loch.
+    final pfad = Path()
+      ..fillType = PathFillType.evenOdd
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          Offset.zero & size,
+          Radius.circular(eckenRadius),
+        ),
+      );
     for (final i in loecher) {
-      stanzungen.addOval(
+      pfad.addOval(
         Rect.fromCircle(center: layout.mitte(i), radius: layout.lochRadius),
       );
     }
-    return Path.combine(PathOperation.difference, karte, stanzungen);
+    return pfad;
   }
 
   @override

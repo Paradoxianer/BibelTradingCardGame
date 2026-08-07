@@ -282,7 +282,7 @@ class _Vorschau extends StatelessWidget {
   }
 }
 
-/// Offene Handkarte: antippen wählt aus, langes Drücken zeigt sie groß.
+/// Offene Handkarte: antippen wählt aus, Doppeltippen zeigt sie groß.
 class _AntippbareHandkarte extends StatelessWidget {
   final Karte karte;
   final bool spielbar;
@@ -301,7 +301,7 @@ class _AntippbareHandkarte extends StatelessWidget {
     opacity: spielbar ? 1.0 : 0.45,
     child: GestureDetector(
       onTap: spielbar ? onTap : null,
-      onLongPress: () => zeigeKarteGross(context, karte),
+      onDoubleTap: () => zeigeKarteGross(context, karte),
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),

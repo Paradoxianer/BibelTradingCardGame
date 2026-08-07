@@ -138,7 +138,9 @@ void main() {
 
     final vorher = bloc.state.spiel.aktiverSpieler.spielfelder[0].stapel.length;
     await tester.tap(find.byType(Draggable<Karte>).first);
-    await tester.pump();
+    // Neben dem Einzeltipp hört die Karte auf Doppeltippen (Großansicht).
+    // Flutter meldet den Einzeltipp deshalb erst, wenn kein zweiter folgt.
+    await tester.pump(const Duration(milliseconds: 400));
     expect(bloc.state.ausgewaehlteHandkarte, isNotNull);
 
     await tester.tap(find.byKey(const ValueKey('eigenes-feld-0')));

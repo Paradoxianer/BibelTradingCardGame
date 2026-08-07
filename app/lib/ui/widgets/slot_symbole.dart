@@ -85,13 +85,19 @@ class _SlotPainter extends CustomPainter {
     final zaehlt = zelle.symbol is Loch || zelle.symbol is Schwarz;
     if (zaehlt) _dreiecke(canvas, mitte, kontur);
 
-    // Weiße Kontur als etwas größerer Kreis darunter.
-    canvas.drawCircle(mitte, r + kontur, Paint()..color = Colors.white);
-
     switch (zelle.symbol) {
       case Loch():
-        // Nur der Ring; die Mitte bleibt frei und wird zusätzlich aus der
-        // Karte gestanzt, sodass dort durchscheint, was darunter liegt.
+        // Beim Loch nur eine weiße Kontur **außen** um den Ring — eine
+        // gefüllte Scheibe würde die Öffnung zusetzen, durch die man sehen
+        // soll. Die Mitte bleibt frei und wird aus der Karte gestanzt.
+        canvas.drawCircle(
+          mitte,
+          r + kontur / 2,
+          Paint()
+            ..color = Colors.white
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = kontur,
+        );
         canvas.drawCircle(
           mitte,
           r - ringDicke / 2,
@@ -101,6 +107,7 @@ class _SlotPainter extends CustomPainter {
             ..strokeWidth = ringDicke,
         );
       case Schwarz():
+        canvas.drawCircle(mitte, r + kontur, Paint()..color = Colors.white);
         canvas.drawCircle(mitte, r, Paint()..color = Colors.black);
         // Minus-Balken.
         canvas.drawRRect(
@@ -115,6 +122,7 @@ class _SlotPainter extends CustomPainter {
           Paint()..color = Colors.white,
         );
       case Farbig(wert: final wert):
+        canvas.drawCircle(mitte, r + kontur, Paint()..color = Colors.white);
         canvas.drawCircle(mitte, r, Paint()..color = personenFarbe(zelle.pos));
         canvas.drawCircle(
           mitte,

@@ -203,6 +203,25 @@ class _KartenaufbauSeite extends StatelessWidget {
   }
 }
 
+/// Unterlegt eine Demo-Karte mit dem Spielbrett-Grün. Auf hellem Grund wäre
+/// nicht zu sehen, dass ein Loch durchsichtig ist — und genau darum geht es
+/// auf dieser Seite.
+class _AufBrett extends StatelessWidget {
+  final Widget child;
+
+  const _AufBrett({required this.child});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: const Color(0xFF2A4433),
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: child,
+  );
+}
+
 class _SymbolErklaerung extends StatelessWidget {
   final String bild;
   final String titel;
@@ -264,7 +283,7 @@ class _LochMechanikSeite extends StatelessWidget {
                 children: [
                   const Text('Vorher', style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  StapelWidget(feld: vorher, breite: 110),
+                  _AufBrett(child: StapelWidget(feld: vorher, breite: 110)),
                   const SizedBox(height: 8),
                   const Text('−1 Punkt sichtbar', style: TextStyle(color: Colors.grey)),
                 ],
@@ -277,7 +296,7 @@ class _LochMechanikSeite extends StatelessWidget {
                 children: [
                   const Text('Nachher', style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  StapelWidget(feld: nachher, breite: 110),
+                  _AufBrett(child: StapelWidget(feld: nachher, breite: 110)),
                   const SizedBox(height: 8),
                   const Text(
                     '+2 −1 = +1 Punkt sichtbar',
