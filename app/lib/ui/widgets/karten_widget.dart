@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'loch_stanzung.dart';
 import 'slot_layout.dart';
-import 'slot_zeile.dart';
+import 'slot_symbole.dart';
 
 /// Wie viel einer Karte gezeigt wird. **Kein** zweites Design: in beiden
 /// Fällen dieselben Elemente in derselben Gestaltung, nur unterschiedlich
@@ -60,7 +60,7 @@ class KartenWidget extends StatelessWidget {
   }) => KartenWidget(
     key: key,
     karte: karte,
-    slots: SlotZeile.fuerKarte(karte).zellen,
+    slots: slotsFuerKarte(karte),
     ansicht: ansicht,
     breite: breite,
   );
@@ -73,7 +73,7 @@ class KartenWidget extends StatelessWidget {
   }) => KartenWidget(
     key: key,
     karte: karte,
-    slots: SlotZeile.fuerVerdeckteKarte(karte).zellen,
+    slots: slotsFuerVerdeckteKarte(karte),
     breite: breite,
     rueckseite: true,
   );
@@ -331,10 +331,8 @@ class _SlotBand extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Positioned(
-    top: layout.oben,
-    left: layout.startX,
-    child: SlotZeile(zellen: slots, groesse: layout.zelle),
+  Widget build(BuildContext context) => Positioned.fill(
+    child: SlotSymbole(zellen: slots, layout: layout),
   );
 }
 

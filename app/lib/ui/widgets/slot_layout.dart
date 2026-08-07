@@ -24,8 +24,10 @@ class SlotLayout {
   /// Waagerechter Abstand zwischen zwei Zellen (je 1 px Polsterung).
   static const double abstand = 2;
 
-  /// Anteil der Zellbreite, den die durchsichtige Lochmitte einnimmt.
-  /// Aus dem Tile gemessen: Innenradius 121,5 von 378 px Kachelbreite.
+  /// Maße aus dem Original-Artwork (378 px Kachel): Außenradius des Kreises
+  /// 143,5 und Innenradius des Rings 121,5 — daraus ergibt sich auch die
+  /// Ringdicke.
+  static const double _symbolRadiusAnteil = 143.5 / 378;
   static const double _lochRadiusAnteil = 121.5 / 378;
 
   double get gesamtBreite => 6 * zelle + 5 * abstand;
@@ -38,7 +40,9 @@ class SlotLayout {
     oben + zelle / 2,
   );
 
-  /// Radius der Stanzung — nur die Innenfläche, Ring und Dreiecke bleiben
-  /// stehen.
+  /// Außenradius des gezeichneten Kreises.
+  double get symbolRadius => zelle * _symbolRadiusAnteil;
+
+  /// Radius der Stanzung — nur die Innenfläche, der Ring bleibt stehen.
   double get lochRadius => zelle * _lochRadiusAnteil;
 }

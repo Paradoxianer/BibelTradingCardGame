@@ -1,5 +1,5 @@
 import 'package:btcg_app/ui/widgets/karten_widget.dart';
-import 'package:btcg_app/ui/widgets/slot_zeile.dart';
+import 'package:btcg_app/ui/widgets/slot_symbole.dart';
 import 'package:btcg_engine/engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,36 +19,35 @@ Karte _karte(String id, List<String> slots, {String seltenheit = 'haeufig'}) =>
       pictureLink: '',
     );
 
-List<String> _assets(WidgetTester tester) => tester
-    .widgetList<Image>(find.byType(Image))
-    .map((img) => (img.image as AssetImage).assetName)
-    .where((a) => a.contains('/V_') || a.contains('/S_') || a.contains('/HG_'))
-    .where((a) => !a.endsWith('_x.png')) // Löcher verraten keinen Wert
-    .toList();
+/// Die tatsächlich gezeichneten Slot-Zellen aus dem Widgetbaum.
+List<SlotAnzeige> _gezeichnet(WidgetTester tester) =>
+    tester.widget<SlotSymbole>(find.byType(SlotSymbole)).zellen;
 
 Future<void> _zeige(WidgetTester tester, Widget w) async {
-  await tester.pumpWidget(
-    MaterialApp(home: Scaffold(body: Center(child: w))),
-  );
+  await tester.pumpWidget(MaterialApp(home: Scaffold(body: Center(child: w))));
 }
 
 void main() {
   final karte = _karte('a', ['x', '1', '-1', '0', '2', '0']);
 
-  testWidgets('kompakt und voll zeigen dieselben sechs Slot-Zellen', (
+  testWidgets('kompakt und voll zeichnen dieselben sechs Zellen', (
     tester,
   ) async {
     await _zeige(tester, KartenWidget.handkarte(karte));
-    final kompakt = _assets(tester);
+    final kompakt = _gezeichnet(tester);
 
     await _zeige(
       tester,
       KartenWidget.handkarte(karte, ansicht: KartenAnsicht.voll, breite: 320),
     );
-    final voll = _assets(tester);
+    final voll = _gezeichnet(tester);
 
-    expect(kompakt.length, 5, reason: '6 Slots, davon einer ein Loch');
-    expect(kompakt, voll, reason: 'gleiche Karte, gleiche Symbole');
+    expect(kompakt.length, 6);
+    expect(
+      kompakt.map((z) => (z.pos, z.symbol, z.verdeckt)),
+      voll.map((z) => (z.pos, z.symbol, z.verdeckt)),
+      reason: 'gleiche Karte, gleiche Symbole — nur anders angeordnet',
+    );
   });
 
   testWidgets('nur die Vollansicht zeigt Bibeltext und card_id', (
@@ -70,29 +69,30 @@ void main() {
   testWidgets('Rückseite verrät keinen Wert und spiegelt die Löcher', (
     tester,
   ) async {
-    // Loch nur an V1 (erste Position von vorne).
+    // Loch nur an V1 (vorne).
     final einLoch = _karte('b', ['x', '1', '1', '1', '1', '1']);
     await _zeige(tester, KartenWidget.verdeckt(einLoch));
 
-    expect(
-      _assets(tester),
-      isEmpty,
-      reason: 'kein einziges Wert-Tile — Werte bleiben verborgen (D9)',
-    );
-
-    // Gespiegelt liegt das Loch an letzter Stelle.
-    final zellen = SlotZeile.fuerVerdeckteKarte(einLoch).zellen;
-    expect(zellen.first.verdeckt, isTrue);
-    expect(zellen.last.verdeckt, isFalse, reason: 'das Loch, jetzt hinten');
-    expect(zellen.last.symbol, isA<Loch>());
+    final zellen = _gezeichnet(tester);
     expect(zellen.length, 6);
+    expect(
+      zellen.where((z) => !z.verdeckt).map((z) => z.symbol),
+      everyElement(isA<Loch>()),
+      reason: 'sichtbar sind ausschließlich Löcher (D9)',
+    );
+    expect(zellen.last.symbol, isA<Loch>(), reason: 'gespiegelt nach hinten');
   });
 
   testWidgets('Seltenheit bestimmt die Rahmenfarbe', (tester) async {
     expect(seltenheitsFarbe('einzigartig'), isNot(seltenheitsFarbe('haeufig')));
     expect(seltenheitsFarbe('episch'), isNot(seltenheitsFarbe('selten')));
 
-    await _zeige(tester, KartenWidget.handkarte(_karte('c', ['0', '0', '0', '0', '0', '0'], seltenheit: 'episch')));
+    await _zeige(
+      tester,
+      KartenWidget.handkarte(
+        _karte('c', ['0', '0', '0', '0', '0', '0'], seltenheit: 'episch'),
+      ),
+    );
     final rahmen = tester
         .widgetList<DecoratedBox>(find.byType(DecoratedBox))
         .map((d) => d.decoration)
@@ -107,6 +107,23 @@ void main() {
   ) async {
     await _zeige(tester, StapelWidget(feld: const Spielfeld()));
     expect(find.text('leer'), findsOneWidget);
-    expect(_assets(tester), isEmpty, reason: 'keine Karte, keine Symbole');
+    expect(find.byType(SlotSymbole), findsNothing, reason: 'keine Karte');
+  });
+
+  testWidgets('Stapel zeichnet jede Karte, damit Löcher echt durchscheinen', (
+    tester,
+  ) async {
+    final unten = _karte('unten', ['2', '2', '2', '2', '2', '2']);
+    final oben = _karte('oben', ['x', '0', '0', '0', '0', '0']);
+    await _zeige(
+      tester,
+      StapelWidget(feld: Spielfeld([Kartenlage(oben), Kartenlage(unten)])),
+    );
+
+    expect(
+      find.byType(SlotSymbole),
+      findsNWidgets(2),
+      reason: 'beide Karten werden gezeichnet, nicht nur die oberste',
+    );
   });
 }
