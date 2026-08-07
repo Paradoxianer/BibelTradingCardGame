@@ -70,7 +70,7 @@ class _SlotPainter extends CustomPainter {
   void _zelle(Canvas canvas, SlotAnzeige zelle, Offset mitte) {
     final r = layout.symbolRadius;
     final kontur = layout.zelle * _konturAnteil;
-    final ringDicke = layout.symbolRadius - layout.lochRadius;
+    final ringDicke = layout.ringDicke;
 
     if (zelle.verdeckt) {
       // Rückseite: nur die Stanzung ist ablesbar, kein Wert.

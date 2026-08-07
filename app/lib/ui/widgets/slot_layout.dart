@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 /// Wo die sechs Slot-Kreise auf einer Karte sitzen.
@@ -43,6 +44,17 @@ class SlotLayout {
   /// Außenradius des gezeichneten Kreises.
   double get symbolRadius => zelle * _symbolRadiusAnteil;
 
+  /// Dicke des schwarzen Rings.
+  ///
+  /// Das Original-Verhältnis (22 von 143,5 Radius) ergibt auf kleinen Karten
+  /// einen Ring unter einem Pixel — dort ist dann nicht mehr zu erkennen,
+  /// dass es sich um ein Loch handelt. Deshalb eine Untergrenze.
+  static const double _mindestRing = 1.6;
+
+  double get ringDicke =>
+      math.max(symbolRadius * (1 - _lochRadiusAnteil / _symbolRadiusAnteil),
+          _mindestRing);
+
   /// Radius der Stanzung — nur die Innenfläche, der Ring bleibt stehen.
-  double get lochRadius => zelle * _lochRadiusAnteil;
+  double get lochRadius => symbolRadius - ringDicke;
 }
