@@ -126,4 +126,40 @@ void main() {
       expect(jePerson.containsKey(Person.sohn), isFalse);
     });
   });
+
+  group('werteFeld (einzelnes Feld, u.a. für die UI-Vorschau)', () {
+    test('stimmt mit berechneWertung für dasselbe Feld überein', () {
+      final unten = testKarte('u', ['2', '-1', '0', '0', '0', '0']);
+      final oben = testKarte('o', ['x', 'x', '0', '0', '0', '0']);
+      final feld = testFeld([oben, unten]);
+      final s = testSpieler(
+        'p1',
+        spielfelder: [feld, const Spielfeld(), const Spielfeld()],
+      );
+
+      final ausGesamtwertung = berechneWertung(testState([s]), 'p1').felder[0];
+      expect(werteFeld(feld, 0).punkte, ausGesamtwertung.punkte);
+      // 2 durch Loch sichtbar, -1 zählt immer.
+      expect(werteFeld(feld, 0).punkte, 1);
+    });
+
+    test('bewertet ein hypothetisches Feld: Karte drauflegen als Vorschau', () {
+      final unten = testKarte('u', ['2', '2', '0', '0', '0', '0']);
+      final feld = testFeld([unten]);
+      // Bunte Werte der obersten Karte zählen nicht -> vorher 0 Punkte.
+      expect(werteFeld(feld, 0).punkte, 0);
+
+      // Karte mit Löchern darüber legt die beiden 2er frei.
+      final mitLoechern = testKarte('o', ['x', 'x', '0', '0', '0', '0']);
+      expect(werteFeld(feld.legeObenauf(mitLoechern), 0).punkte, 4);
+
+      // Karte ohne Löcher verdeckt sie -> bleibt 0.
+      final ohneLoecher = testKarte('o2', ['1', '1', '0', '0', '0', '0']);
+      expect(werteFeld(feld.legeObenauf(ohneLoecher), 0).punkte, 0);
+    });
+
+    test('leeres Feld bringt 0 Punkte', () {
+      expect(werteFeld(const Spielfeld(), 0).punkte, 0);
+    });
+  });
 }

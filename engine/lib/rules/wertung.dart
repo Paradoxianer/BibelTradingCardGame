@@ -96,43 +96,52 @@ int _globalerZuschlag(GameState state) {
   return summe;
 }
 
+/// Wertet ein einzelnes Spielfeld (REGELWERK §6, ohne globale Effekte).
+///
+/// Eigenständig aufrufbar, damit die UI auch ein *hypothetisches* Feld
+/// bewerten kann — etwa für die Vorschau „was brächte diese Karte hier?":
+/// `werteFeld(feld.legeObenauf(karte), i).punkte`.
+FeldWertung werteFeld(Spielfeld feld, int feldIndex) {
+  final slotWertungen = <SlotWertung>[];
+
+  for (final pos in kSlotOrder) {
+    final gefunden = sichtbaresSymbolAn(feld, pos);
+    if (gefunden == null) {
+      slotWertungen.add(SlotWertung(slot: pos, tiefe: 0, punkte: 0));
+      continue;
+    }
+    final (symbol: symbol, tiefe: tiefe) = gefunden;
+    int punkte;
+    switch (symbol) {
+      case Schwarz():
+        punkte = _umkehrungAktiv(feld, pos) ? 1 : symbol.wert;
+      case Farbig(wert: final wert):
+        punkte = tiefe > 0 ? wert : 0;
+      case Loch():
+        punkte = 0; // unerreichbar, sichtbaresSymbolAn liefert nie ein Loch
+    }
+    slotWertungen.add(
+      SlotWertung(
+        slot: pos,
+        tiefe: tiefe,
+        punkte: punkte,
+        quellKarte: feld.stapel[tiefe].karte,
+      ),
+    );
+  }
+
+  return FeldWertung(feldIndex: feldIndex, slots: slotWertungen);
+}
+
 /// Pure Funktion nach REGELWERK §6. Wertet alle Spielfelder von [spielerId].
 Wertung berechneWertung(GameState state, String spielerId) {
   final spieler = state.spielerMitId(spielerId);
-  final felder = <FeldWertung>[];
-
-  for (var feldIndex = 0; feldIndex < spieler.spielfelder.length; feldIndex++) {
-    final feld = spieler.spielfelder[feldIndex];
-    final slotWertungen = <SlotWertung>[];
-
-    for (final pos in kSlotOrder) {
-      final gefunden = sichtbaresSymbolAn(feld, pos);
-      if (gefunden == null) {
-        slotWertungen.add(SlotWertung(slot: pos, tiefe: 0, punkte: 0));
-        continue;
-      }
-      final (symbol: symbol, tiefe: tiefe) = gefunden;
-      int punkte;
-      switch (symbol) {
-        case Schwarz():
-          punkte = _umkehrungAktiv(feld, pos) ? 1 : symbol.wert;
-        case Farbig(wert: final wert):
-          punkte = tiefe > 0 ? wert : 0;
-        case Loch():
-          punkte = 0; // unerreichbar, _sichtbaresSymbol liefert nie Loch
-      }
-      final quellKarte = feld.stapel[tiefe].karte;
-      slotWertungen.add(
-        SlotWertung(slot: pos, tiefe: tiefe, punkte: punkte, quellKarte: quellKarte),
-      );
-    }
-
-    felder.add(FeldWertung(feldIndex: feldIndex, slots: slotWertungen));
-  }
-
   return Wertung(
     spielerId: spielerId,
-    felder: felder,
+    felder: [
+      for (var i = 0; i < spieler.spielfelder.length; i++)
+        werteFeld(spieler.spielfelder[i], i),
+    ],
     globalerZuschlag: _globalerZuschlag(state),
   );
 }
