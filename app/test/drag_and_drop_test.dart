@@ -4,6 +4,9 @@ import 'package:btcg_engine/engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hydrated_bloc/hydrated_bloc.dart';
+
+import 'test_storage.dart';
 
 Karte _karte(
   String id,
@@ -51,26 +54,26 @@ Kartenset _kartenset() => Kartenset(
 
 GameBloc _bloc(Kartenset kartenset) => GameBloc(
   kartenset: kartenset,
-  anfangszustand: neuesSpiel(
-    spieler: [
-      baueZufaelligesDeck(
-        id: 'p1',
-        name: 'p1',
-        alleKarten: kartenset.alleKarten,
-        seed: 1,
-      ),
-      baueZufaelligesDeck(
-        id: 'p2',
-        name: 'p2',
-        alleKarten: kartenset.alleKarten,
-        seed: 2,
-      ),
-    ],
-    seed: 5,
-  ),
+  aufbauListe: [
+    baueZufaelligesDeck(
+      id: 'p1',
+      name: 'p1',
+      alleKarten: kartenset.alleKarten,
+      seed: 1,
+    ),
+    baueZufaelligesDeck(
+      id: 'p2',
+      name: 'p2',
+      alleKarten: kartenset.alleKarten,
+      seed: 2,
+    ),
+  ],
+  seed: 5,
 );
 
 void main() {
+  setUp(() => HydratedBloc.storage = SpeicherImArbeitsspeicher());
+
   testWidgets('Handkarte per Drag auf ein eigenes Feld ziehen baut sie dort', (
     tester,
   ) async {
