@@ -5,12 +5,6 @@ import 'package:flutter/material.dart';
 // zum Grund (DWDS unterstützt keine `..`-relativen Assets).
 const String _artworkBasis = 'assets/artwork';
 
-/// Overlay „dieser Wert zählt": die beiden Dreiecke, transparent dazwischen.
-/// Die Bestands-Tiles `-1` und `x` tragen sie fest eingebaut, weil sie immer
-/// zählen; bunte Werte bekommen sie zur Laufzeit, sobald durch ein Loch auf
-/// sie geschaut wird (ARCHITEKTUR §3).
-const String _markerPfad = '$_artworkBasis/Loch_Marker.png';
-
 String _prefixFuer(SlotPosition pos) => switch (pos) {
   SlotPosition.v1 || SlotPosition.v2 => 'V',
   SlotPosition.s1 || SlotPosition.s2 => 'S',
@@ -104,13 +98,11 @@ class SlotZeile extends StatelessWidget {
               width: groesse,
               height: groesse,
               // Rückseite: Wert bleibt verborgen, Löcher nicht (D9).
-              // Loch: nur Ring und Dreiecke — die Mitte ist aus der Karte
-              // ausgestanzt (LochStanzung), dort scheint durch, was
-              // darunter liegt.
+              // Beim Loch-Tile wird die schraffierte Innenfläche von der
+              // LochStanzung weggeschnitten; stehen bleiben Ring und
+              // Dreiecke, und dort scheint durch, was darunter liegt.
               child: zelle.verdeckt
                   ? const _VerdeckterSlot()
-                  : zelle.symbol is Loch
-                  ? Image.asset(_markerPfad)
                   : Image.asset(tilePfad(zelle.pos, zelle.symbol)),
             ),
           ),

@@ -112,24 +112,42 @@ class KartenWidget extends StatelessWidget {
           layout: _layout,
           eckenRadius: _eckenRadius,
         ),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(
-              color: seltenheitsFarbe(k.seltenheit),
-              width: breite / 40,
+        // Der Rahmen liegt bewusst NICHT als `border` am Container: ein
+        // Border rückt den Inhalt um seine Breite ein, der Clip-Pfad rechnet
+        // aber in Koordinaten der ganzen Karte — die Löcher säßen dann neben
+        // den gezeichneten Kreisen. Deshalb wird er obenauf gemalt.
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ColoredBox(
+              color: Colors.white,
+              child: ansicht == KartenAnsicht.voll
+                  ? _VolleKarte(
+                      karte: k,
+                      slots: slots,
+                      breite: breite,
+                      layout: _layout,
+                    )
+                  : _KompakteKarte(
+                      karte: k,
+                      slots: slots,
+                      breite: breite,
+                      layout: _layout,
+                      rueckseite: rueckseite,
+                    ),
             ),
-            borderRadius: BorderRadius.circular(_eckenRadius),
-          ),
-          child: ansicht == KartenAnsicht.voll
-              ? _VolleKarte(karte: k, slots: slots, breite: breite, layout: _layout)
-              : _KompakteKarte(
-                  karte: k,
-                  slots: slots,
-                  breite: breite,
-                  layout: _layout,
-                  rueckseite: rueckseite,
+            IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: seltenheitsFarbe(k.seltenheit),
+                    width: breite / 40,
+                  ),
+                  borderRadius: BorderRadius.circular(_eckenRadius),
                 ),
+              ),
+            ),
+          ],
         ),
       ),
     );

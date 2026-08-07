@@ -23,6 +23,7 @@ List<String> _assets(WidgetTester tester) => tester
     .widgetList<Image>(find.byType(Image))
     .map((img) => (img.image as AssetImage).assetName)
     .where((a) => a.contains('/V_') || a.contains('/S_') || a.contains('/HG_'))
+    .where((a) => !a.endsWith('_x.png')) // Löcher verraten keinen Wert
     .toList();
 
 Future<void> _zeige(WidgetTester tester, Widget w) async {
@@ -46,7 +47,7 @@ void main() {
     );
     final voll = _assets(tester);
 
-    expect(kompakt.length, 5, reason: '5 Wert-Tiles, das Loch hat keins');
+    expect(kompakt.length, 5, reason: '6 Slots, davon einer ein Loch');
     expect(kompakt, voll, reason: 'gleiche Karte, gleiche Symbole');
   });
 
@@ -93,8 +94,8 @@ void main() {
 
     await _zeige(tester, KartenWidget.handkarte(_karte('c', ['0', '0', '0', '0', '0', '0'], seltenheit: 'episch')));
     final rahmen = tester
-        .widgetList<Container>(find.byType(Container))
-        .map((c) => c.decoration)
+        .widgetList<DecoratedBox>(find.byType(DecoratedBox))
+        .map((d) => d.decoration)
         .whereType<BoxDecoration>()
         .where((d) => d.border != null)
         .toList();

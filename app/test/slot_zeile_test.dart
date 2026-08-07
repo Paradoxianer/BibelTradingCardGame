@@ -22,7 +22,8 @@ List<String> _assets(WidgetTester tester) => tester
     .map((img) => (img.image as AssetImage).assetName)
     .toList();
 
-const String _marker = 'assets/artwork/Loch_Marker.png';
+// Löcher zeigen das x-Tile; dessen Innenfläche stanzt LochStanzung aus.
+const String _loch = 'assets/artwork/V_x.png';
 
 void main() {
   testWidgets('Handkarte: immer 6 Zellen, Loch zeigt den durchsichtigen Marker', (
@@ -35,7 +36,7 @@ void main() {
     // Das Loch zeichnet nur Ring und Dreiecke; die Mitte bleibt frei, damit
     // der Hintergrund durchscheint.
     expect(assets, [
-      _marker,
+      _loch,
       'assets/artwork/V_1.png',
       'assets/artwork/S_-1.png',
       'assets/artwork/S_0.png',
@@ -52,7 +53,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: SlotZeile.fuerKarte(karte)));
 
     final assets = _assets(tester);
-    expect(assets.first, _marker, reason: 'Loch: nur Ring und Dreiecke');
+    expect(assets.first, _loch, reason: 'Loch: nur Ring und Dreiecke');
     expect(assets[1], 'assets/artwork/V_2.png');
     expect(assets.length, 6);
   });
