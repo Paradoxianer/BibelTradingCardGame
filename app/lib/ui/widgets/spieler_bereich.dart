@@ -45,7 +45,7 @@ class SpielerBereich extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: amZug ? 0.55 : 0.3),
+        color: Colors.black.withValues(alpha: amZug ? 0.16 : 0.30),
         border: Border.all(
           color: amZug ? Colors.amber.shade700 : Colors.transparent,
           width: 2,
@@ -113,6 +113,7 @@ class _Kopfzeile extends StatelessWidget {
         spieler.name,
         style: TextStyle(
           fontSize: 14,
+          color: Colors.white,
           fontWeight: amZug ? FontWeight.bold : FontWeight.normal,
         ),
       ),
@@ -121,12 +122,16 @@ class _Kopfzeile extends StatelessWidget {
       const SizedBox(width: 3),
       Text(
         '${spieler.heiligkeit}',
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+        style: const TextStyle(
+          fontSize: 14,
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
       ),
       const SizedBox(width: 10),
       Text(
         'Hand ${spieler.hand.length}',
-        style: const TextStyle(fontSize: 11, color: Colors.black54),
+        style: const TextStyle(fontSize: 11, color: Colors.white70),
       ),
     ],
   );
@@ -143,10 +148,10 @@ class _Punkte extends StatelessWidget {
       fontSize: 12,
       fontWeight: FontWeight.bold,
       color: wert > 0
-          ? Colors.green.shade700
+          ? Colors.greenAccent
           : wert < 0
-          ? Colors.red.shade700
-          : Colors.grey.shade600,
+          ? Colors.redAccent
+          : Colors.white54,
     ),
   );
 }
@@ -173,14 +178,17 @@ class _Ziehstapel extends StatelessWidget {
             border: Border.all(color: Colors.black26),
             borderRadius: BorderRadius.circular(breite / 14),
           ),
-          child: const Text('leer', style: TextStyle(fontSize: 10, color: Colors.black54)),
+          child: const Text(
+            'leer',
+            style: TextStyle(fontSize: 10, color: Colors.white54),
+          ),
         )
       else
         KartenWidget.verdeckt(deck.first, breite: breite),
       const SizedBox(height: 2),
       Text(
         deck.isEmpty ? 'Deck leer' : '${deck.length} im Deck',
-        style: const TextStyle(fontSize: 10, color: Colors.black54),
+        style: const TextStyle(fontSize: 10, color: Colors.white70),
       ),
     ],
   );
@@ -205,7 +213,7 @@ class _Hand extends StatelessWidget {
       return const Center(
         child: Text(
           'keine Handkarten',
-          style: TextStyle(fontSize: 11, color: Colors.black45),
+          style: TextStyle(fontSize: 11, color: Colors.white54),
         ),
       );
     }
