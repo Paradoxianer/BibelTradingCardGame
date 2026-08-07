@@ -125,7 +125,7 @@ Feinjustierung von Zahlenwerten in Phase 1b (Simulation).
 | D6 | Evil-Handverstopfung | Keine eigene Sonderregel. Ventil ist der Effekt `erneuerung` (EFFEKTE.md §2.7); Simulation prüft, ob das genügt |
 | D7 | EStart | **Aus den Bestandsdaten übernommen:** alle 6 Slots `-1`, keine Löcher (`strongness -6`) |
 | D8 | Targeting 3+ Spieler | Regel „nur wer diese Runde noch kein Evil bekam" bleibt; Kingmaking wird zunächst zugelassen und in Phase 1b gemessen |
-| D9 | Informationsstand | Hand und Deck sind **verborgen**. Ausliegende Stapel dürfen **jederzeit durchgeblättert** werden (App: Tippen auf den Stapel zeigt alle Karten von oben nach unten) |
+| D9 | Informationsstand | Karteninhalte in Hand und Deck sind **verborgen**; die **Loch-Positionen** verdeckter Karten sind dagegen **für alle sichtbar** (Stanzungen sind auch von der Rückseite zu sehen). Sichtbar sind sie bei jeder Handkarte der Mitspieler und bei der obersten Deckkarte. Ausliegende Stapel dürfen **jederzeit durchgeblättert** werden (App: Tippen auf den Stapel zeigt alle Karten von oben nach unten) |
 | D10 | Umordnung | Bestätigt als einzige Ausnahme von D3: Effekt `umordnung` (EFFEKTE.md §2.8), Gegner-Variante nur auf Evil-Karten |
 
 ### Erläuterung zu D7 — „Alle sind Sünder"

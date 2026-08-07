@@ -1,6 +1,5 @@
 import 'package:btcg_app/bloc/game_bloc.dart';
 import 'package:btcg_app/ui/screens/spiel_screen.dart';
-import 'package:btcg_app/ui/widgets/handkarte_widget.dart';
 import 'package:btcg_engine/engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -97,7 +96,7 @@ void main() {
     final vorherStapel = bloc.state.spiel.aktiverSpieler.spielfelder[0].stapel.length;
 
     // Erste spielbare Handkarte greifen und auf das erste Feld ziehen.
-    final handkarte = find.byType(HandkarteWidget).first;
+    final handkarte = find.byType(Draggable<Karte>).first;
     final ziel = find.byKey(const ValueKey('eigenes-feld-0'));
     final geste = await tester.startGesture(tester.getCenter(handkarte));
     await tester.pump(const Duration(milliseconds: 100));
@@ -135,7 +134,7 @@ void main() {
     await tester.pump();
 
     final vorher = bloc.state.spiel.aktiverSpieler.spielfelder[0].stapel.length;
-    await tester.tap(find.byType(HandkarteWidget).first);
+    await tester.tap(find.byType(Draggable<Karte>).first);
     await tester.pump();
     expect(bloc.state.ausgewaehlteHandkarte, isNotNull);
 

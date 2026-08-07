@@ -1,7 +1,7 @@
 import 'package:btcg_engine/engine.dart';
 import 'package:flutter/material.dart';
 
-import '../widgets/stapel_widget.dart';
+import '../widgets/karten_widget.dart';
 
 Karte _demoKarte(String id, List<String> slots) => Karte(
   id: id,
@@ -19,7 +19,7 @@ Karte _demoKarte(String id, List<String> slots) => Karte(
 
 /// Kurzes, seitenweises Tutorial vor dem ersten Spiel. Die Loch-Mechanik ist
 /// laut ARCHITEKTUR.md das "visuelle Alleinstellungsmerkmal" — hier wird sie
-/// nicht nur erklärt, sondern mit echten [StapelWidget]s vorgeführt.
+/// nicht nur erklärt, sondern mit echten [KartenWidget]s vorgeführt.
 class OnboardingScreen extends StatefulWidget {
   final VoidCallback onFertig;
 
@@ -264,7 +264,7 @@ class _LochMechanikSeite extends StatelessWidget {
                 children: [
                   const Text('Vorher', style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  StapelWidget(feld: vorher),
+                  StapelWidget(feld: vorher, breite: 110),
                   const SizedBox(height: 8),
                   const Text('−1 Punkt sichtbar', style: TextStyle(color: Colors.grey)),
                 ],
@@ -277,7 +277,7 @@ class _LochMechanikSeite extends StatelessWidget {
                 children: [
                   const Text('Nachher', style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  StapelWidget(feld: nachher),
+                  StapelWidget(feld: nachher, breite: 110),
                   const SizedBox(height: 8),
                   const Text(
                     '+2 −1 = +1 Punkt sichtbar',
