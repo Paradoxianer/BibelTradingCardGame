@@ -26,6 +26,31 @@ const BoxDecoration _bretthintergrund = BoxDecoration(
   ),
 );
 
+/// Kartenbreite für Felder und eigene Hand, abhängig von der
+/// Bildschirmbreite: auf schmalen (Handy-)Bildschirmen bleibt es bei der
+/// bisherigen kompakten Größe, auf breiten (Tablet/Desktop-)Bildschirmen
+/// wächst sie Richtung echter Kartengröße — besser lesbare Slots und
+/// Bibeltext beim Spielen selbst (Issue #8; nicht zu verwechseln mit der
+/// bereits vorhandenen Großansicht per Doppeltipp).
+double feldBreiteFuerBildschirm(double bildschirmBreite) {
+  const kompakt = 120.0;
+  const real = 180.0;
+  const schmalAb = 600.0;
+  const breitAb = 1100.0;
+  if (bildschirmBreite <= schmalAb) return kompakt;
+  if (bildschirmBreite >= breitAb) return real;
+  final t = (bildschirmBreite - schmalAb) / (breitAb - schmalAb);
+  return kompakt + (real - kompakt) * t;
+}
+
+/// Verhältnis der Ziehstapel-/verdeckte-Hand-Breite zur Feldbreite
+/// (bisheriges festes Verhältnis 74/120, jetzt bildschirmabhängig skaliert).
+const double _kleinVerhaeltnis = 74 / 120;
+
+/// Verhältnis der Zieh-Vorschau (Draggable-Feedback) zur Feldbreite
+/// (bisheriges festes Verhältnis 132/120).
+const double _feedbackVerhaeltnis = 132 / 120;
+
 class SpielScreen extends StatelessWidget {
   final VoidCallback onNeuesSpiel;
 
@@ -60,6 +85,7 @@ class _SpielBrett extends StatelessWidget {
   Widget build(BuildContext context) {
     final spiel = state.spiel;
     final aktiver = spiel.aktiverSpieler;
+    final feldBreite = feldBreiteFuerBildschirm(MediaQuery.sizeOf(context).width);
 
     return Scaffold(
       appBar: AppBar(title: Text(_phaseName(spiel.phase))),
@@ -86,8 +112,18 @@ class _SpielBrett extends StatelessWidget {
                     // Man sitzt sich gegenüber: die Mitspieler oben, der
                     // eigene Bereich unten vor einem.
                     for (final s in spiel.spieler.where((s) => s.id != aktiver.id))
-                      _Bereich(spieler: s, state: state, eigen: false),
-                    _Bereich(spieler: aktiver, state: state, eigen: true),
+                      _Bereich(
+                        spieler: s,
+                        state: state,
+                        eigen: false,
+                        feldBreite: feldBreite,
+                      ),
+                    _Bereich(
+                      spieler: aktiver,
+                      state: state,
+                      eigen: true,
+                      feldBreite: feldBreite,
+                    ),
                   ],
                 ),
               ),
@@ -109,11 +145,13 @@ class _Bereich extends StatelessWidget {
   final Spieler spieler;
   final GameUiState state;
   final bool eigen;
+  final double feldBreite;
 
   const _Bereich({
     required this.spieler,
     required this.state,
     required this.eigen,
+    required this.feldBreite,
   });
 
   @override
@@ -127,6 +165,8 @@ class _Bereich extends StatelessWidget {
       spieler: spieler,
       eigen: eigen,
       amZug: eigen,
+      feldBreite: feldBreite,
+      kleinBreite: feldBreite * _kleinVerhaeltnis,
       feldPunkte: eigen
           ? [
               for (var i = 0; i < spieler.spielfelder.length; i++)
@@ -148,6 +188,7 @@ class _Bereich extends StatelessWidget {
         builder: (context, kandidaten, _) => _AntippbaresFeld(
           key: eigen ? ValueKey('eigenes-feld-$i') : null,
           feld: spieler.spielfelder[i],
+          breite: feldBreite,
           hervorgehoben: kandidaten.isNotEmpty,
           vorschauKarte: kandidaten.isEmpty ? null : kandidaten.first,
           onTap: eigen
@@ -165,6 +206,7 @@ class _Bereich extends StatelessWidget {
         final ausgewaehlt = karte.id == state.ausgewaehlteHandkarte?.id;
         final karteWidget = _AntippbareHandkarte(
           karte: karte,
+          breite: feldBreite,
           spielbar: spielbar,
           ausgewaehlt: ausgewaehlt,
           onTap: () => bloc.add(HandkarteAngetippt(karte)),
@@ -176,7 +218,10 @@ class _Bereich extends StatelessWidget {
           data: karte,
           feedback: Material(
             color: Colors.transparent,
-            child: KartenWidget.handkarte(karte, breite: 132),
+            child: KartenWidget.handkarte(
+              karte,
+              breite: feldBreite * _feedbackVerhaeltnis,
+            ),
           ),
           childWhenDragging: Opacity(opacity: 0.3, child: karteWidget),
           child: karteWidget,
@@ -189,6 +234,7 @@ class _Bereich extends StatelessWidget {
 /// Spielfeld mit Auswahlrahmen und optionaler Ablege-Vorschau.
 class _AntippbaresFeld extends StatelessWidget {
   final Spielfeld feld;
+  final double breite;
   final bool hervorgehoben;
   final Karte? vorschauKarte;
   final VoidCallback onTap;
@@ -196,6 +242,7 @@ class _AntippbaresFeld extends StatelessWidget {
   const _AntippbaresFeld({
     super.key,
     required this.feld,
+    required this.breite,
     required this.hervorgehoben,
     required this.vorschauKarte,
     required this.onTap,
@@ -220,7 +267,7 @@ class _AntippbaresFeld extends StatelessWidget {
             ),
             child: Padding(
               padding: const EdgeInsets.all(2),
-              child: StapelWidget(feld: feld),
+              child: StapelWidget(feld: feld, breite: breite),
             ),
           ),
           if (vorschauKarte != null)
@@ -286,12 +333,14 @@ class _Vorschau extends StatelessWidget {
 /// Offene Handkarte: antippen wählt aus, Doppeltippen zeigt sie groß.
 class _AntippbareHandkarte extends StatelessWidget {
   final Karte karte;
+  final double breite;
   final bool spielbar;
   final bool ausgewaehlt;
   final VoidCallback onTap;
 
   const _AntippbareHandkarte({
     required this.karte,
+    required this.breite,
     required this.spielbar,
     required this.ausgewaehlt,
     required this.onTap,
@@ -313,7 +362,7 @@ class _AntippbareHandkarte extends StatelessWidget {
         ),
         child: Padding(
           padding: const EdgeInsets.all(2),
-          child: KartenWidget.handkarte(karte),
+          child: KartenWidget.handkarte(karte, breite: breite),
         ),
       ),
     ),

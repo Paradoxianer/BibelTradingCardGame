@@ -25,6 +25,15 @@ class SpielerBereich extends StatelessWidget {
   /// Baut eine offene Handkarte (nur im eigenen Bereich genutzt).
   final Widget Function(BuildContext, Karte)? handkarteBauen;
 
+  /// Kartenbreite der Felder bzw. der eigenen Hand — auf großen Bildschirmen
+  /// größer als auf schmalen (spiel_screen.dart berechnet den Wert aus der
+  /// Bildschirmbreite, vgl. Issue #8).
+  final double feldBreite;
+
+  /// Kartenbreite von Ziehstapel und fremder (verdeckter) Hand — bewusst
+  /// kleiner, da diese Karten nicht gelesen werden müssen.
+  final double kleinBreite;
+
   const SpielerBereich({
     super.key,
     required this.spieler,
@@ -33,14 +42,13 @@ class SpielerBereich extends StatelessWidget {
     required this.feldBauen,
     this.feldPunkte = const [],
     this.handkarteBauen,
+    this.feldBreite = 120,
+    this.kleinBreite = 74,
   });
-
-  static const double _feldBreite = 120;
-  static const double _kleinBreite = 74;
 
   @override
   Widget build(BuildContext context) {
-    final handBreite = eigen ? _feldBreite : _kleinBreite;
+    final handBreite = eigen ? feldBreite : kleinBreite;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       padding: const EdgeInsets.all(8),
@@ -86,7 +94,7 @@ class SpielerBereich extends StatelessWidget {
             ),
           ),
         const SizedBox(width: 12),
-        _Ziehstapel(deck: spieler.deck, breite: _kleinBreite),
+        _Ziehstapel(deck: spieler.deck, breite: kleinBreite),
       ],
     ),
     const SizedBox(height: 8),
