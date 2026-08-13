@@ -159,6 +159,26 @@ schon einen großen Vorteil bringt** — das ist ein Datenpunkt, dem die
 Kartenwerte-Feinjustierung (ROADMAP Phase 1b Schritt 4) Beachtung schenken
 sollte.
 
+## Nachtrag 2026-08-13 — D5 mit größerer Stichprobe bestätigt
+
+Zur Entscheidung D5 (REGELWERK §7) zusätzlich Greedy vs. Greedy mit n=1000
+statt 300 und drei verschiedenen Seeds gegengetestet, um „im Rauschen bei
+n=300" (oben) fester zu belegen:
+
+| Seed | Ohne D5 | Mit D5 | Differenz |
+|---|---:|---:|---:|
+| 1 | 51,2% | 51,6% | +0,4 |
+| 7 | 52,5% | 52,1% | −0,4 |
+| 99 | 51,8% | 51,9% | +0,1 |
+
+Differenz wechselt das Vorzeichen zwischen den Seeds und bleibt überall
+unter 0,5 Punkten — kein systematischer Effekt. Alle sechs Läufe liegen
+zudem bereits im oder knapp am Zielkorridor (48–52%), deutlich unter der
+ursprünglichen 56%-Prototyp-Baseline aus REGELWERK §7. **Entscheidung: D5
+wird nicht übernommen** — der Flag bleibt im Code (`RegelConfig.
+startspielerZiehtNurVier`, per CLI: `--startspieler-vier`) für spätere
+Nachmessungen (z. B. sobald `tun`/`lehre` befüllt sind), Standard bleibt aus.
+
 ## Bekannte Grenzen
 
 - **Keine Effektkarten im Bestand** (alle 106 Karten: `effekt: null`) — die
