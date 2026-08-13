@@ -153,11 +153,7 @@ void main() {
     final box = tester.renderObject<RenderBox>(karte);
     final ecke = box.localToGlobal(Offset.zero);
     final breite = box.size.width;
-    final layout = SlotLayout(
-      kartenBreite: breite,
-      zelle: breite / 8.2,
-      oben: breite / 40,
-    );
+    final layout = SlotLayout.fuerKarte(breite);
 
     final imLoch = farbeAn(ecke + layout.mitte(0));
     final nebenDerKarte = farbeAn(ecke + Offset(-8, breite / 2));

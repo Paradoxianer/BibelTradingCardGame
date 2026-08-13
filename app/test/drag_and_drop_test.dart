@@ -1,5 +1,6 @@
 import 'package:btcg_app/bloc/game_bloc.dart';
 import 'package:btcg_app/ui/screens/spiel_screen.dart';
+import 'package:btcg_app/ui/widgets/karten_widget.dart';
 import 'package:btcg_engine/engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -144,10 +145,70 @@ void main() {
     expect(bloc.state.ausgewaehlteHandkarte, isNotNull);
 
     await tester.tap(find.byKey(const ValueKey('eigenes-feld-0')));
-    await tester.pump();
+    // Felder hören jetzt ebenfalls auf Doppeltippen (Stapel-Großansicht).
+    await tester.pump(const Duration(milliseconds: 400));
     expect(
       bloc.state.spiel.aktiverSpieler.spielfelder[0].stapel.length,
       vorher + 1,
+    );
+  });
+
+  testWidgets('Doppeltippen auf ein Feld zeigt den Stapel groß, in Vollansicht', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1600, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final bloc = _bloc(_kartenset());
+    addTearDown(bloc.close);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BlocProvider.value(
+          value: bloc,
+          child: SpielScreen(onNeuesSpiel: () {}),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // Leeres Feld: Doppeltippen zeigt absichtlich nichts, es gibt nichts zu
+    // vergrößern.
+    final leeresFeld = find.byKey(const ValueKey('eigenes-feld-1'));
+    await tester.tap(leeresFeld);
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(leeresFeld);
+    await tester.pumpAndSettle();
+    expect(find.byType(Dialog), findsNothing);
+
+    // Karte aufs erste Feld legen, dann darauf doppeltippen.
+    final belegtesFeld = find.byKey(const ValueKey('eigenes-feld-0'));
+    final geste = await tester.startGesture(
+      tester.getCenter(find.byType(Draggable<Karte>).first),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    await geste.moveTo(tester.getCenter(belegtesFeld));
+    await tester.pump(const Duration(milliseconds: 100));
+    await geste.up();
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(belegtesFeld);
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(belegtesFeld);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Dialog), findsOneWidget);
+    final volleKarten = tester
+        .widgetList<KartenWidget>(find.byType(KartenWidget))
+        .where((w) => w.ansicht == KartenAnsicht.voll);
+    expect(
+      volleKarten,
+      isNotEmpty,
+      reason:
+          'Feld-Großansicht zeigt die Karte(n) in Vollansicht mit Bibeltext, '
+          'wie die Großansicht einer einzelnen Karte',
     );
   });
 }

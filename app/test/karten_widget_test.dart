@@ -64,6 +64,9 @@ void main() {
     );
     expect(find.text('Denn ich weiß …'), findsOneWidget);
     expect(find.text('a'), findsWidgets); // Name und card_id
+    // Die Stelle steht schon in der Namensleiste — nicht noch einmal unter
+    // dem Bibeltext.
+    expect(find.text('Philipper 1,19'), findsOneWidget);
   });
 
   testWidgets('Rückseite verrät keinen Wert und spiegelt die Löcher', (

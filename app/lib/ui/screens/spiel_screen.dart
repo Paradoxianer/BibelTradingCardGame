@@ -206,6 +206,7 @@ class _AntippbaresFeld extends StatelessWidget {
     final jetzt = werteFeld(feld, 0).punkte;
     return GestureDetector(
       onTap: onTap,
+      onDoubleTap: feld.istLeer ? null : () => zeigeFeldGross(context, feld),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -330,6 +331,25 @@ void zeigeKarteGross(BuildContext context, Karte karte) {
         karte,
         ansicht: KartenAnsicht.voll,
         breite: 320,
+      ),
+    ),
+  );
+}
+
+/// Der ganze Stapel groß — nicht nur die oberste Karte, sondern der
+/// tatsächliche physische Stapel, damit man sieht, was durch die Löcher der
+/// obersten Karte hindurchscheint (dieselbe [StapelWidget]-Stapelung wie auf
+/// dem Brett, nur größer und in [KartenAnsicht.voll] mit Bibeltext — dieselbe
+/// Ansicht wie bei einer einzelnen Karte, nicht die verdichtete Brettform).
+void zeigeFeldGross(BuildContext context, Spielfeld feld) {
+  showDialog<void>(
+    context: context,
+    builder: (context) => Dialog(
+      backgroundColor: Colors.transparent,
+      child: StapelWidget(
+        feld: feld,
+        breite: 320,
+        ansicht: KartenAnsicht.voll,
       ),
     ),
   );

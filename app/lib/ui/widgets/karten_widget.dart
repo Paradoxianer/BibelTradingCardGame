@@ -82,14 +82,9 @@ class KartenWidget extends StatelessWidget {
       ansicht == KartenAnsicht.voll ? breite * 1.5 : breite * 0.92;
 
   double get _hoehe => hoeheFuer(breite, ansicht);
-  double get _zelle => breite / 8.2;
   double get _eckenRadius => breite / 14;
 
-  SlotLayout get _layout => SlotLayout(
-    kartenBreite: breite,
-    zelle: _zelle,
-    oben: breite / 40,
-  );
+  SlotLayout get _layout => SlotLayout.fuerKarte(breite);
 
   @override
   Widget build(BuildContext context) {
@@ -161,12 +156,18 @@ class KartenWidget extends StatelessWidget {
 class StapelWidget extends StatelessWidget {
   final Spielfeld feld;
   final double breite;
+  final KartenAnsicht ansicht;
 
-  const StapelWidget({super.key, required this.feld, this.breite = 120});
+  const StapelWidget({
+    super.key,
+    required this.feld,
+    this.breite = 120,
+    this.ansicht = KartenAnsicht.kompakt,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final hoehe = KartenWidget.hoeheFuer(breite, KartenAnsicht.kompakt);
+    final hoehe = KartenWidget.hoeheFuer(breite, ansicht);
     if (feld.istLeer) return _LeeresFeld(breite: breite, hoehe: hoehe);
 
     return SizedBox(
@@ -177,7 +178,11 @@ class StapelWidget extends StatelessWidget {
           // Unterste Karte zuerst, oberste zuletzt.
           for (final lage in feld.stapel.reversed)
             Positioned.fill(
-              child: KartenWidget.handkarte(lage.karte, breite: breite),
+              child: KartenWidget.handkarte(
+                lage.karte,
+                ansicht: ansicht,
+                breite: breite,
+              ),
             ),
         ],
       ),
@@ -275,21 +280,14 @@ class _VolleKarte extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Die Bibelstelle steht schon in der Namensleiste oben —
+                    // hier nur der Text, keine zweite Angabe der Stelle.
                     Expanded(
                       child: SingleChildScrollView(
                         child: Text(
                           karte.vers.text,
                           style: TextStyle(fontSize: breite / 24, height: 1.25),
                         ),
-                      ),
-                    ),
-                    Text(
-                      karte.vers.stelle,
-                      textAlign: TextAlign.right,
-                      style: TextStyle(
-                        fontSize: breite / 24,
-                        fontStyle: FontStyle.italic,
-                        fontWeight: FontWeight.bold,
                       ),
                     ),
                     SizedBox(height: breite / 40),
