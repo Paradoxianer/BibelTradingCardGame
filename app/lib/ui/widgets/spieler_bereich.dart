@@ -25,13 +25,16 @@ class SpielerBereich extends StatelessWidget {
   /// Baut eine offene Handkarte (nur im eigenen Bereich genutzt).
   final Widget Function(BuildContext, Karte)? handkarteBauen;
 
-  /// Kartenbreite der Felder bzw. der eigenen Hand — auf großen Bildschirmen
-  /// größer als auf schmalen (spiel_screen.dart berechnet den Wert aus der
-  /// Bildschirmbreite, vgl. Issue #8).
+  /// Ansicht der Felder bzw. der eigenen Hand: kompakt auf schmalen, voll
+  /// (mit Bibeltext, wie die bisherige Großansicht) auf breiten Bildschirmen
+  /// (spiel_screen.dart entscheidet anhand der Bildschirmbreite, Issue #8).
+  final KartenAnsicht ansicht;
+
+  /// Kartenbreite der Felder bzw. der eigenen Hand, passend zu [ansicht].
   final double feldBreite;
 
   /// Kartenbreite von Ziehstapel und fremder (verdeckter) Hand — bewusst
-  /// kleiner, da diese Karten nicht gelesen werden müssen.
+  /// fest und klein, da diese Karten nie gelesen werden müssen.
   final double kleinBreite;
 
   const SpielerBereich({
@@ -42,6 +45,7 @@ class SpielerBereich extends StatelessWidget {
     required this.feldBauen,
     this.feldPunkte = const [],
     this.handkarteBauen,
+    this.ansicht = KartenAnsicht.kompakt,
     this.feldBreite = 120,
     this.kleinBreite = 74,
   });
@@ -102,6 +106,7 @@ class SpielerBereich extends StatelessWidget {
       spieler: spieler,
       eigen: eigen,
       breite: handBreite,
+      ansicht: eigen ? ansicht : KartenAnsicht.kompakt,
       handkarteBauen: handkarteBauen,
     ),
   ];
@@ -206,12 +211,14 @@ class _Hand extends StatelessWidget {
   final Spieler spieler;
   final bool eigen;
   final double breite;
+  final KartenAnsicht ansicht;
   final Widget Function(BuildContext, Karte)? handkarteBauen;
 
   const _Hand({
     required this.spieler,
     required this.eigen,
     required this.breite,
+    required this.ansicht,
     required this.handkarteBauen,
   });
 
@@ -229,7 +236,7 @@ class _Hand extends StatelessWidget {
     // Die Mindestbreite sorgt dafür, dass die Zeile den Platz ausfüllt und
     // ihre Karten dadurch mittig stehen.
     return SizedBox(
-      height: breite * 0.92 + 6,
+      height: KartenWidget.hoeheFuer(breite, ansicht) + 6,
       child: LayoutBuilder(
         builder: (context, grenzen) => SingleChildScrollView(
           scrollDirection: Axis.horizontal,

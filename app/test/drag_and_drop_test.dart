@@ -79,7 +79,8 @@ void main() {
     tester,
   ) async {
     // Grosse Surface, damit Hand und Felder gleichzeitig sichtbar sind.
-    tester.view.physicalSize = const Size(1600, 1200);
+    // Unter 1200px bleibt es bei der kompakten Kartenansicht (spiel_screen.dart).
+    tester.view.physicalSize = const Size(1000, 1200);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
@@ -120,7 +121,8 @@ void main() {
   testWidgets('Antippen funktioniert weiterhin parallel zum Ziehen', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(1600, 1200);
+    // Unter 1200px bleibt es bei der kompakten Kartenansicht (spiel_screen.dart).
+    tester.view.physicalSize = const Size(1000, 1200);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
@@ -156,7 +158,8 @@ void main() {
   testWidgets('Doppeltippen auf ein Feld zeigt den Stapel groß, in Vollansicht', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(1600, 1200);
+    // Unter 1200px bleibt es bei der kompakten Kartenansicht (spiel_screen.dart).
+    tester.view.physicalSize = const Size(1000, 1200);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 

@@ -48,32 +48,28 @@ GameBloc _bloc(Kartenset kartenset) => GameBloc(
 void main() {
   setUp(() => HydratedBloc.storage = SpeicherImArbeitsspeicher());
 
-  group('feldBreiteFuerBildschirm', () {
-    test('bleibt auf Handy-Breiten bei der bisherigen kompakten Größe', () {
-      expect(feldBreiteFuerBildschirm(360), 120);
-      expect(feldBreiteFuerBildschirm(600), 120);
+  group('kartenDarstellungFuerBildschirm', () {
+    test('bleibt unter der Schwelle bei der bisherigen kompakten Ansicht', () {
+      final schmal = kartenDarstellungFuerBildschirm(700);
+      expect(schmal.ansicht, KartenAnsicht.kompakt);
+      expect(schmal.breite, 120);
     });
 
-    test('wächst zwischen 600 und 1100 Richtung echter Kartengröße', () {
-      final mitte = feldBreiteFuerBildschirm(850);
-      expect(mitte, greaterThan(120));
-      expect(mitte, lessThan(180));
-    });
-
-    test('erreicht ab 1100 die volle Zielgröße und wächst nicht weiter', () {
-      expect(feldBreiteFuerBildschirm(1100), 180);
-      expect(feldBreiteFuerBildschirm(2000), 180);
+    test('wechselt ab der Schwelle direkt auf die volle Kartenansicht', () {
+      final breit = kartenDarstellungFuerBildschirm(1600);
+      expect(breit.ansicht, KartenAnsicht.voll);
+      expect(breit.breite, 320);
     });
   });
 
   testWidgets(
-    'Feldkarten sind auf einem breiten Bildschirm größer als auf einem schmalen',
+    'Feldkarten zeigen auf einem breiten Bildschirm die volle Ansicht mit Bibeltext',
     (tester) async {
       addTearDown(tester.view.reset);
       final bloc = _bloc(_kartenset());
       addTearDown(bloc.close);
 
-      Future<double> breiteDerErstenFeldkarte(Size groesse) async {
+      Future<KartenWidget> ersteFeldkarte(Size groesse) async {
         tester.view.physicalSize = groesse;
         tester.view.devicePixelRatio = 1.0;
         await tester.pumpWidget(
@@ -88,20 +84,16 @@ void main() {
               matching: find.byType(KartenWidget),
             )
             .first;
-        return tester.getSize(karte).width;
+        return tester.widget<KartenWidget>(karte);
       }
 
-      // 400px ist schmaler, als die Feldreihe selbst bei kompakter
-      // Kartengröße braucht — das ist ein vorbestehendes Layout-Problem für
-      // sehr schmale Bildschirme (nicht Gegenstand dieses Features) und
-      // würde hier nur einen Overflow im Testbaum auslösen. 700px ist knapp
-      // über der kompakten Schwelle (600) und bleibt overflow-frei.
-      final schmal = await breiteDerErstenFeldkarte(const Size(700, 1400));
-      final breit = await breiteDerErstenFeldkarte(const Size(1600, 1400));
+      final schmal = await ersteFeldkarte(const Size(700, 1400));
+      expect(schmal.ansicht, KartenAnsicht.kompakt);
+      expect(schmal.breite, 120);
 
-      expect(breit, 180);
-      expect(schmal, greaterThanOrEqualTo(120));
-      expect(schmal, lessThan(breit));
+      final breit = await ersteFeldkarte(const Size(1600, 1400));
+      expect(breit.ansicht, KartenAnsicht.voll);
+      expect(breit.breite, 320);
     },
   );
 }

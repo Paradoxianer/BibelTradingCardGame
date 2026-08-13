@@ -26,30 +26,16 @@ const BoxDecoration _bretthintergrund = BoxDecoration(
   ),
 );
 
-/// Kartenbreite für Felder und eigene Hand, abhängig von der
-/// Bildschirmbreite: auf schmalen (Handy-)Bildschirmen bleibt es bei der
-/// bisherigen kompakten Größe, auf breiten (Tablet/Desktop-)Bildschirmen
-/// wächst sie Richtung echter Kartengröße — besser lesbare Slots und
-/// Bibeltext beim Spielen selbst (Issue #8; nicht zu verwechseln mit der
-/// bereits vorhandenen Großansicht per Doppeltipp).
-double feldBreiteFuerBildschirm(double bildschirmBreite) {
-  const kompakt = 120.0;
-  const real = 180.0;
-  const schmalAb = 600.0;
-  const breitAb = 1100.0;
-  if (bildschirmBreite <= schmalAb) return kompakt;
-  if (bildschirmBreite >= breitAb) return real;
-  final t = (bildschirmBreite - schmalAb) / (breitAb - schmalAb);
-  return kompakt + (real - kompakt) * t;
-}
-
-/// Verhältnis der Ziehstapel-/verdeckte-Hand-Breite zur Feldbreite
-/// (bisheriges festes Verhältnis 74/120, jetzt bildschirmabhängig skaliert).
-const double _kleinVerhaeltnis = 74 / 120;
-
-/// Verhältnis der Zieh-Vorschau (Draggable-Feedback) zur Feldbreite
-/// (bisheriges festes Verhältnis 132/120).
-const double _feedbackVerhaeltnis = 132 / 120;
+/// Nur zwei Zustände, keine Zwischengrößen (keep it simple): auf schmalen
+/// (Handy-)Bildschirmen die bisherige kompakte Darstellung, auf breiten
+/// (Tablet/Desktop-)Bildschirmen direkt dieselbe Vollansicht wie in der
+/// Großansicht per Doppeltipp — echte Kartengröße mit Bibeltext, statt nur
+/// einer größer skalierten kompakten Karte (Issue #8).
+({KartenAnsicht ansicht, double breite}) kartenDarstellungFuerBildschirm(
+  double bildschirmBreite,
+) => bildschirmBreite >= 1200
+    ? (ansicht: KartenAnsicht.voll, breite: 320.0)
+    : (ansicht: KartenAnsicht.kompakt, breite: 120.0);
 
 class SpielScreen extends StatelessWidget {
   final VoidCallback onNeuesSpiel;
@@ -85,7 +71,7 @@ class _SpielBrett extends StatelessWidget {
   Widget build(BuildContext context) {
     final spiel = state.spiel;
     final aktiver = spiel.aktiverSpieler;
-    final feldBreite = feldBreiteFuerBildschirm(MediaQuery.sizeOf(context).width);
+    final darstellung = kartenDarstellungFuerBildschirm(MediaQuery.sizeOf(context).width);
 
     return Scaffold(
       appBar: AppBar(title: Text(_phaseName(spiel.phase))),
@@ -116,13 +102,15 @@ class _SpielBrett extends StatelessWidget {
                         spieler: s,
                         state: state,
                         eigen: false,
-                        feldBreite: feldBreite,
+                        ansicht: darstellung.ansicht,
+                        feldBreite: darstellung.breite,
                       ),
                     _Bereich(
                       spieler: aktiver,
                       state: state,
                       eigen: true,
-                      feldBreite: feldBreite,
+                      ansicht: darstellung.ansicht,
+                      feldBreite: darstellung.breite,
                     ),
                   ],
                 ),
@@ -145,12 +133,14 @@ class _Bereich extends StatelessWidget {
   final Spieler spieler;
   final GameUiState state;
   final bool eigen;
+  final KartenAnsicht ansicht;
   final double feldBreite;
 
   const _Bereich({
     required this.spieler,
     required this.state,
     required this.eigen,
+    required this.ansicht,
     required this.feldBreite,
   });
 
@@ -165,8 +155,8 @@ class _Bereich extends StatelessWidget {
       spieler: spieler,
       eigen: eigen,
       amZug: eigen,
+      ansicht: ansicht,
       feldBreite: feldBreite,
-      kleinBreite: feldBreite * _kleinVerhaeltnis,
       feldPunkte: eigen
           ? [
               for (var i = 0; i < spieler.spielfelder.length; i++)
@@ -189,6 +179,7 @@ class _Bereich extends StatelessWidget {
           key: eigen ? ValueKey('eigenes-feld-$i') : null,
           feld: spieler.spielfelder[i],
           breite: feldBreite,
+          ansicht: ansicht,
           hervorgehoben: kandidaten.isNotEmpty,
           vorschauKarte: kandidaten.isEmpty ? null : kandidaten.first,
           onTap: eigen
@@ -207,6 +198,7 @@ class _Bereich extends StatelessWidget {
         final karteWidget = _AntippbareHandkarte(
           karte: karte,
           breite: feldBreite,
+          ansicht: ansicht,
           spielbar: spielbar,
           ausgewaehlt: ausgewaehlt,
           onTap: () => bloc.add(HandkarteAngetippt(karte)),
@@ -218,10 +210,7 @@ class _Bereich extends StatelessWidget {
           data: karte,
           feedback: Material(
             color: Colors.transparent,
-            child: KartenWidget.handkarte(
-              karte,
-              breite: feldBreite * _feedbackVerhaeltnis,
-            ),
+            child: KartenWidget.handkarte(karte, breite: feldBreite, ansicht: ansicht),
           ),
           childWhenDragging: Opacity(opacity: 0.3, child: karteWidget),
           child: karteWidget,
@@ -235,6 +224,7 @@ class _Bereich extends StatelessWidget {
 class _AntippbaresFeld extends StatelessWidget {
   final Spielfeld feld;
   final double breite;
+  final KartenAnsicht ansicht;
   final bool hervorgehoben;
   final Karte? vorschauKarte;
   final VoidCallback onTap;
@@ -243,6 +233,7 @@ class _AntippbaresFeld extends StatelessWidget {
     super.key,
     required this.feld,
     required this.breite,
+    required this.ansicht,
     required this.hervorgehoben,
     required this.vorschauKarte,
     required this.onTap,
@@ -251,9 +242,12 @@ class _AntippbaresFeld extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final jetzt = werteFeld(feld, 0).punkte;
+    // Bei ansicht == voll zeigt das Feld Bibeltext & Co. schon direkt an —
+    // die Großansicht-Dialog wäre dann nur eine identische Kopie.
+    final grossansichtNoetig = !feld.istLeer && ansicht != KartenAnsicht.voll;
     return GestureDetector(
       onTap: onTap,
-      onDoubleTap: feld.istLeer ? null : () => zeigeFeldGross(context, feld),
+      onDoubleTap: grossansichtNoetig ? () => zeigeFeldGross(context, feld) : null,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -267,7 +261,7 @@ class _AntippbaresFeld extends StatelessWidget {
             ),
             child: Padding(
               padding: const EdgeInsets.all(2),
-              child: StapelWidget(feld: feld, breite: breite),
+              child: StapelWidget(feld: feld, breite: breite, ansicht: ansicht),
             ),
           ),
           if (vorschauKarte != null)
@@ -334,6 +328,7 @@ class _Vorschau extends StatelessWidget {
 class _AntippbareHandkarte extends StatelessWidget {
   final Karte karte;
   final double breite;
+  final KartenAnsicht ansicht;
   final bool spielbar;
   final bool ausgewaehlt;
   final VoidCallback onTap;
@@ -341,6 +336,7 @@ class _AntippbareHandkarte extends StatelessWidget {
   const _AntippbareHandkarte({
     required this.karte,
     required this.breite,
+    required this.ansicht,
     required this.spielbar,
     required this.ausgewaehlt,
     required this.onTap,
@@ -351,7 +347,9 @@ class _AntippbareHandkarte extends StatelessWidget {
     opacity: spielbar ? 1.0 : 0.45,
     child: GestureDetector(
       onTap: spielbar ? onTap : null,
-      onDoubleTap: () => zeigeKarteGross(context, karte),
+      // Bei ansicht == voll zeigt die Handkarte Bibeltext & Co. schon direkt
+      // an — die Großansicht-Dialog wäre dann nur eine identische Kopie.
+      onDoubleTap: ansicht == KartenAnsicht.voll ? null : () => zeigeKarteGross(context, karte),
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
@@ -362,7 +360,7 @@ class _AntippbareHandkarte extends StatelessWidget {
         ),
         child: Padding(
           padding: const EdgeInsets.all(2),
-          child: KartenWidget.handkarte(karte, breite: breite),
+          child: KartenWidget.handkarte(karte, breite: breite, ansicht: ansicht),
         ),
       ),
     ),

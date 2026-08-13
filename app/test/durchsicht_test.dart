@@ -85,7 +85,8 @@ void main() {
   testWidgets('durch das Loch einer Handkarte sieht man das Spielbrett', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(1600, 1400);
+    // Unter 1200px bleibt es bei der kompakten Kartenansicht (spiel_screen.dart).
+    tester.view.physicalSize = const Size(1000, 1400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
