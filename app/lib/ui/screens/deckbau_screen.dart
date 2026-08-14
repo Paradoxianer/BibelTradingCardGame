@@ -2,11 +2,19 @@ import 'package:btcg_engine/engine.dart';
 import 'package:flutter/material.dart';
 
 import '../../data/deck_repository.dart';
+import '../widgets/karten_widget.dart';
+
+const double _kartenBreite = 110;
 
 /// Eigenes Deck zusammenstellen (Issue #17): Auswahl aus dem ganzen
 /// Kartenpool (Kartenbesitz gibt es noch nicht, siehe #10/#11 — bis dahin
 /// steht der volle Bestand zur Verfügung), Live-Prüfung gegen REGELWERK §2
 /// über [pruefeDeck], Speichern über [DeckRepository].
+///
+/// Zwei Karussells mit der echten Kartenansicht ([KartenWidget]) statt einer
+/// Textliste: Slots, Werte und Löcher müssen beim Deckbau genauso sichtbar
+/// sein wie im Spiel selbst — oben das gebaute Deck, unten der Kartenpool,
+/// aus dem man antippend hinzufügt.
 class DeckbauScreen extends StatefulWidget {
   final Kartenset kartenset;
 
@@ -35,10 +43,7 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
 
   void _hinzufuegen(Karte karte) => setState(() => _deck.add(karte));
 
-  void _entfernen(Karte karte) => setState(() {
-    final index = _deck.indexWhere((k) => k.id == karte.id);
-    if (index != -1) _deck.removeAt(index);
-  });
+  void _entfernen(int deckIndex) => setState(() => _deck.removeAt(deckIndex));
 
   void _zufaelligFuellen() {
     final aufbau = baueZufaelligesDeck(
@@ -67,25 +72,17 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
       appBar: AppBar(title: const Text('Eigenes Deck')),
       body: Column(
         children: [
-          _StatusLeiste(
-            gesamt: _deck.length,
-            evil: evilAnzahl,
-            fehler: fehler,
-          ),
+          _StatusLeiste(gesamt: _deck.length, evil: evilAnzahl, fehler: fehler),
+          const _Ueberschrift('Dein Deck — antippen entfernt eine Karte'),
+          _DeckKarussell(key: const ValueKey('deck-karussell'), deck: _deck, onEntfernen: _entfernen),
+          const Divider(height: 1),
+          const _Ueberschrift('Kartenpool — antippen fügt eine Karte hinzu'),
           Expanded(
-            child: ListView(
-              children: [
-                for (var i = 0; i < _auswaehlbar.length; i++) ...[
-                  if (i == 0 || _auswaehlbar[i].kategorie != _auswaehlbar[i - 1].kategorie)
-                    _KategorieUeberschrift(kategorie: _auswaehlbar[i].kategorie),
-                  _KartenZeile(
-                    karte: _auswaehlbar[i],
-                    anzahl: _anzahlImDeck(_auswaehlbar[i]),
-                    onHinzufuegen: () => _hinzufuegen(_auswaehlbar[i]),
-                    onEntfernen: () => _entfernen(_auswaehlbar[i]),
-                  ),
-                ],
-              ],
+            child: _PoolKarussell(
+              key: const ValueKey('pool-karussell'),
+              karten: _auswaehlbar,
+              anzahlImDeck: _anzahlImDeck,
+              onHinzufuegen: _hinzufuegen,
             ),
           ),
         ],
@@ -108,6 +105,19 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
       ),
     );
   }
+}
+
+class _Ueberschrift extends StatelessWidget {
+  final String text;
+  const _Ueberschrift(this.text);
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+    child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+  );
 }
 
 class _StatusLeiste extends StatelessWidget {
@@ -140,56 +150,103 @@ class _StatusLeiste extends StatelessWidget {
   );
 }
 
-class _KategorieUeberschrift extends StatelessWidget {
-  final Kategorie kategorie;
+/// Waagerechtes Karussell des aktuell gebauten Decks — jede Karte einzeln,
+/// Duplikate also mehrfach, wie sie tatsächlich im Deck liegen.
+class _DeckKarussell extends StatelessWidget {
+  final List<Karte> deck;
+  final void Function(int deckIndex) onEntfernen;
 
-  const _KategorieUeberschrift({required this.kategorie});
+  const _DeckKarussell({super.key, required this.deck, required this.onEntfernen});
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: double.infinity,
-    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-    child: Text(
-      kategorie.name[0].toUpperCase() + kategorie.name.substring(1),
-      style: const TextStyle(fontWeight: FontWeight.bold),
-    ),
-  );
+  Widget build(BuildContext context) {
+    final hoehe = KartenWidget.hoeheFuer(_kartenBreite, KartenAnsicht.kompakt);
+    return Container(
+      height: hoehe + 12,
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      child: deck.isEmpty
+          ? const Center(child: Text('Noch keine Karten im Deck.'))
+          : ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              itemCount: deck.length,
+              itemBuilder: (context, index) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: GestureDetector(
+                  onTap: () => onEntfernen(index),
+                  child: KartenWidget.handkarte(deck[index], breite: _kartenBreite),
+                ),
+              ),
+            ),
+    );
+  }
 }
 
-class _KartenZeile extends StatelessWidget {
-  final Karte karte;
-  final int anzahl;
-  final VoidCallback onHinzufuegen;
-  final VoidCallback onEntfernen;
+/// Waagerechtes Karussell des ganzen wählbaren Kartenpools, nach Kategorie
+/// sortiert. Ein kleines Abzeichen zeigt, wie oft die Karte schon im Deck
+/// steckt; ist das Limit erreicht, wird die Karte abgeblendet.
+class _PoolKarussell extends StatelessWidget {
+  final List<Karte> karten;
+  final int Function(Karte) anzahlImDeck;
+  final void Function(Karte) onHinzufuegen;
 
-  const _KartenZeile({
-    required this.karte,
-    required this.anzahl,
+  const _PoolKarussell({
+    super.key,
+    required this.karten,
+    required this.anzahlImDeck,
     required this.onHinzufuegen,
-    required this.onEntfernen,
   });
 
   @override
-  Widget build(BuildContext context) => ListTile(
-    title: Text(karte.name),
-    subtitle: Text(karte.vers.stelle),
-    trailing: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          icon: const Icon(Icons.remove_circle_outline),
-          onPressed: anzahl > 0 ? onEntfernen : null,
+  Widget build(BuildContext context) => ListView.builder(
+    scrollDirection: Axis.horizontal,
+    padding: const EdgeInsets.all(6),
+    itemCount: karten.length,
+    itemBuilder: (context, index) {
+      final karte = karten[index];
+      final anzahl = anzahlImDeck(karte);
+      final voll = anzahl >= karte.anzahlImDeckMax;
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        child: GestureDetector(
+          onTap: voll ? null : () => onHinzufuegen(karte),
+          child: Opacity(
+            opacity: voll ? 0.4 : 1.0,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                KartenWidget.handkarte(karte, breite: _kartenBreite),
+                Positioned(
+                  top: -4,
+                  right: -4,
+                  child: _Zaehler(anzahl: anzahl, max: karte.anzahlImDeckMax),
+                ),
+              ],
+            ),
+          ),
         ),
-        SizedBox(
-          width: 36,
-          child: Text('$anzahl/${karte.anzahlImDeckMax}', textAlign: TextAlign.center),
-        ),
-        IconButton(
-          icon: const Icon(Icons.add_circle_outline),
-          onPressed: anzahl < karte.anzahlImDeckMax ? onHinzufuegen : null,
-        ),
-      ],
+      );
+    },
+  );
+}
+
+class _Zaehler extends StatelessWidget {
+  final int anzahl;
+  final int max;
+
+  const _Zaehler({required this.anzahl, required this.max});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+    decoration: BoxDecoration(
+      color: anzahl > 0 ? Colors.blue.shade700 : Colors.black54,
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: Colors.white, width: 1),
+    ),
+    child: Text(
+      '$anzahl/$max',
+      style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
     ),
   );
 }
