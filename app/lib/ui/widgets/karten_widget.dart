@@ -27,6 +27,22 @@ Color seltenheitsFarbe(String seltenheit) => switch (seltenheit) {
   _ => const Color(0xFF7F8C8D), // Grau, häufig
 };
 
+/// Hintergrundfarbe der Namensleiste nach Kategorie — in [KartenAnsicht.kompakt]
+/// die einzige Kategorie-Kennzeichnung auf der Karte, in [KartenAnsicht.voll]
+/// dieselbe Färbung an derselben Stelle. Bewusst als eigene Funktion (nicht
+/// im Enum): eine neue Kategorie (z.B. „Gaben" — Wirken des Heiligen Geistes,
+/// noch nicht in [Kategorie] aufgenommen, das ist eine Regelwerk-Entscheidung)
+/// braucht dann nur eine weitere Zeile hier.
+Color kategorieFarbe(Kategorie kategorie) => switch (kategorie) {
+  Kategorie.gebet => const Color(0xFFE1D5F5), // Violett
+  Kategorie.glauben => const Color(0xFFFCE9B8), // Gold
+  Kategorie.tun => const Color(0xFFD3F0D6), // Grün
+  Kategorie.lehre => const Color(0xFFCFE3F7), // Blau
+  Kategorie.gottesdienst => const Color(0xFFFBDCC0), // Orange
+  Kategorie.evil => const Color(0xFFF3CFCF), // Rot, gedämpft
+  Kategorie.start => Colors.white,
+};
+
 const String _artworkKlein = 'assets/artwork/Placeholder_klein.jpg';
 
 /// Die **einzige** Kartendarstellung der App — für Handkarten, Spielfelder,
@@ -347,7 +363,7 @@ class _Namensleiste extends StatelessWidget {
         horizontal: breite / 26,
         vertical: breite / 40,
       ),
-      color: Colors.white.withValues(alpha: 0.92),
+      color: kategorieFarbe(karte.kategorie).withValues(alpha: 0.92),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,

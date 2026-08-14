@@ -2,6 +2,7 @@ import 'package:btcg_app/data/deck_repository.dart';
 import 'package:btcg_app/ui/screens/deckbau_screen.dart';
 import 'package:btcg_app/ui/widgets/karten_widget.dart';
 import 'package:btcg_engine/engine.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
@@ -34,7 +35,20 @@ Kartenset _kartenset() => Kartenset(
   },
 );
 
-Finder _hinzufuegenKnopf() => find.widgetWithText(FilledButton, 'Zum Deck hinzufügen');
+// FilledButton.tonalIcon/OutlinedButton.icon liefern private Unterklassen
+// (_FilledButtonWithIcon/_OutlinedButtonWithIcon) — find.widgetWithText
+// vergleicht exakt auf den Typ, deshalb hier über ButtonStyleButton (die
+// gemeinsame Basisklasse, die auch onPressed trägt) suchen.
+Finder _hinzufuegenKnopf() => find.ancestor(
+  of: find.text('Zum Deck hinzufügen'),
+  matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+);
+Finder _entfernenKnopf() => find.ancestor(
+  of: find.text('Aus dem Deck entfernen'),
+  matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+);
+final _deckZiel = find.byKey(const ValueKey('deck-dragtarget'));
+final _poolZiel = find.byKey(const ValueKey('pool-dragtarget'));
 
 void main() {
   setUp(() => HydratedBloc.storage = SpeicherImArbeitsspeicher());
@@ -45,6 +59,18 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(MaterialApp(home: DeckbauScreen(kartenset: kartenset)));
     await tester.pump();
+  }
+
+  Future<void> ziehen(WidgetTester tester, Finder quelle, Finder ziel) async {
+    final geste = await tester.startGesture(tester.getCenter(quelle));
+    // LongPressDraggable statt Draggable (damit ein Wisch weiterhin das
+    // Karussell blättert statt eine Karte aufzuheben): erst nach
+    // kLongPressTimeout beginnt der Zug.
+    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+    await geste.moveTo(tester.getCenter(ziel));
+    await tester.pump(const Duration(milliseconds: 50));
+    await geste.up();
+    await tester.pumpAndSettle();
   }
 
   testWidgets('Zufällig füllen ergibt ein gültiges Deck, Speichern legt es ab', (tester) async {
@@ -67,45 +93,42 @@ void main() {
     expect(gespeichert.where((k) => k.kategorie == Kategorie.evil).length, 7);
   });
 
-  testWidgets('Erste Pool-Karte (r0) steht offen zum Durchblättern da, Knopf fügt sie hinzu', (
+  testWidgets('Knopf fügt die zentrierte Pool-Karte hinzu; Knopf entfernt die zentrierte Deck-Karte', (
     tester,
   ) async {
     final kartenset = _kartenset();
     await pumpScreen(tester, kartenset);
 
     expect(find.text('0/35 Karten · 0/7 Evil'), findsOneWidget);
-    expect(
-      find.byWidgetPredicate((w) => w is KartenWidget && w.karte?.id == 'r0'),
-      findsOneWidget,
-      reason: 'r0 ist die erste Karte im sortierten Pool und steht ohne Blättern da',
-    );
+    expect(find.text('Noch keine Karten im Deck.'), findsOneWidget);
 
+    // r0 ist die erste (zentrierte) Karte im sortierten Pool.
     await tester.tap(_hinzufuegenKnopf());
     await tester.pump();
 
     expect(find.text('1/35 Karten · 0/7 Evil'), findsOneWidget);
+    expect(find.text('Noch keine Karten im Deck.'), findsNothing);
+    expect(_entfernenKnopf(), findsOneWidget);
+
+    await tester.tap(_entfernenKnopf());
+    await tester.pump();
+
+    expect(find.text('0/35 Karten · 0/7 Evil'), findsOneWidget);
   });
 
-  testWidgets('Ziehen der aktuellen Pool-Karte auf den Deck-Stapel fügt sie hinzu', (tester) async {
+  testWidgets('Ziehen der Pool-Karte auf das Deck-Ziel fügt sie hinzu', (tester) async {
     final kartenset = _kartenset();
     await pumpScreen(tester, kartenset);
 
-    final r0 = find.byWidgetPredicate((w) => w is Draggable<Karte> && w.data?.id == 'r0');
-    final deckStapel = find.byType(StapelWidget);
+    final r0 = find.byWidgetPredicate((w) => w is Draggable<Object?> && (w.data as dynamic)?.karte?.id == 'r0');
     expect(r0, findsOneWidget);
-    expect(deckStapel, findsOneWidget);
 
-    final geste = await tester.startGesture(tester.getCenter(r0));
-    await tester.pump(const Duration(milliseconds: 50));
-    await geste.moveTo(tester.getCenter(deckStapel));
-    await tester.pump(const Duration(milliseconds: 50));
-    await geste.up();
-    await tester.pumpAndSettle();
+    await ziehen(tester, r0, _deckZiel);
 
     expect(find.text('1/35 Karten · 0/7 Evil'), findsOneWidget);
   });
 
-  testWidgets('Deck antippen öffnet den Durchblättern-Dialog, X entfernt eine Karte', (tester) async {
+  testWidgets('Ziehen der Deck-Karte auf das Pool-Ziel entfernt sie wieder', (tester) async {
     final kartenset = _kartenset();
     await pumpScreen(tester, kartenset);
 
@@ -113,15 +136,53 @@ void main() {
     await tester.pump();
     expect(find.text('1/35 Karten · 0/7 Evil'), findsOneWidget);
 
-    await tester.tap(find.byType(StapelWidget));
-    await tester.pumpAndSettle();
-    expect(find.text('Dein Deck (1)'), findsOneWidget);
+    // r0 ist bis anzahlImDeckMax (3) weiterhin auch im Pool ziehbar — hier
+    // gezielt die Deck-Instanz treffen, nicht die Pool-Instanz.
+    final imDeck = find.byWidgetPredicate(
+      (w) =>
+          w is Draggable<Object?> &&
+          (w.data as dynamic)?.karte?.id == 'r0' &&
+          (w.data as dynamic)?.ausDeck == true,
+    );
+    expect(imDeck, findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.close));
+    await ziehen(tester, imDeck, _poolZiel);
+
+    expect(find.text('0/35 Karten · 0/7 Evil'), findsOneWidget);
+  });
+
+  testWidgets('Ein waagerechter Wisch blättert das Pool-Karussell, statt eine Karte zu ziehen', (
+    tester,
+  ) async {
+    final kartenset = _kartenset();
+    await pumpScreen(tester, kartenset);
+
+    final r0 = find.byWidgetPredicate((w) => w is Draggable<Object?> && (w.data as dynamic)?.karte?.id == 'r0');
+    expect(r0, findsOneWidget);
+
+    // LongPressDraggable lehnt sich aktiv ab, sobald sich der Finger vor
+    // Ablauf der Wartezeit bewegt, und gibt die Geste an die PageView-
+    // Wischgeste weiter — mit einem normalen Draggable (auch mit `axis`)
+    // gewann dieser Wisch nie das Blättern.
+    await tester.fling(r0, const Offset(-400, 0), 800);
+    await tester.pumpAndSettle();
+
+    // Nichts wurde gezogen: das Deck bleibt leer.
+    expect(find.text('0/35 Karten · 0/7 Evil'), findsOneWidget);
+
+    // Aber das Karussell hat geblättert: der Knopf fügt jetzt eine andere
+    // Karte als r0 hinzu.
+    await tester.tap(_hinzufuegenKnopf());
     await tester.pump();
 
-    expect(find.text('Dein Deck (0)'), findsOneWidget);
-    expect(find.text('0/35 Karten · 0/7 Evil'), findsOneWidget, reason: 'Entfernen wirkt auch auf den Hintergrund');
+    expect(find.text('1/35 Karten · 0/7 Evil'), findsOneWidget);
+    final r0ImDeck = find.byWidgetPredicate(
+      (w) =>
+          w is Draggable<Object?> &&
+          (w.data as dynamic)?.karte?.id == 'r0' &&
+          (w.data as dynamic)?.ausDeck == true,
+    );
+    expect(r0ImDeck, findsNothing, reason: 'nach dem Wisch ist nicht mehr r0 zentriert');
   });
 
   testWidgets('Evil-Karten lassen sich nicht doppelt hinzufügen (anzahlImDeckMax 1)', (tester) async {
@@ -137,7 +198,7 @@ void main() {
     await tester.pump();
     expect(find.text('1/35 Karten · 1/7 Evil'), findsOneWidget);
 
-    final knopf = tester.widget<FilledButton>(_hinzufuegenKnopf());
+    final knopf = tester.widget<ButtonStyleButton>(_hinzufuegenKnopf());
     expect(knopf.onPressed, isNull, reason: 'e0 steckt schon einmal im Deck, Max ist 1');
   });
 }

@@ -9,12 +9,13 @@ import '../widgets/karten_widget.dart';
 /// steht der volle Bestand zur Verfügung), Live-Prüfung gegen REGELWERK §2
 /// über [pruefeDeck], Speichern über [DeckRepository].
 ///
-/// Bewusst kein Scroll-Streifen über alle ~106 Karten — das fühlt sich nicht
-/// wie ein Kartenstapel an, den man durchblättert, sondern wie eine Tabelle.
-/// Stattdessen: das Deck als **echter physischer Stapel** ([StapelWidget],
-/// dieselbe Darstellung wie im Spiel, in [KartenAnsicht.voll]), und der Pool
-/// als Ein-Karte-nach-der-anderen-Browser zum Durchblättern — beide per
-/// Drag&Drop verbunden, genau wie Handkarte-auf-Feld im eigentlichen Spiel.
+/// Zwei CoverFlow-Karussells ([_KartenCoverflow], Hauptkarte in der Mitte,
+/// Nachbarn kleiner und blasser daneben — wie beim klassischen
+/// Apple-Coverflow) statt einer Textliste oder eines Scroll-Streifens: oben
+/// das gebaute Deck, unten der Kartenpool, dazwischen frei in beide
+/// Richtungen ziehbar. Zieht man eine Deck-Karte in den Pool, verschwindet
+/// sie aus dem Deck — vorbereitet für ein künftiges Besitz-Modell, in dem
+/// der Pool tatsächlich nur noch die Karten zeigt, die man (noch) hat.
 class DeckbauScreen extends StatefulWidget {
   final Kartenset kartenset;
 
@@ -24,9 +25,22 @@ class DeckbauScreen extends StatefulWidget {
   State<DeckbauScreen> createState() => _DeckbauScreenState();
 }
 
+/// Eine gezogene Karte plus Herkunft — damit ein Drop-Ziel unterscheiden
+/// kann, ob eine Pool-Karte ins Deck soll (hinzufügen) oder eine
+/// Deck-Karte in den Pool zurück (entfernen), auch wenn beide Karussells
+/// gleichzeitig Drag-Quelle und Drop-Ziel sind.
+class _Zug {
+  final Karte karte;
+  final bool ausDeck;
+  const _Zug(this.karte, {required this.ausDeck});
+}
+
 class _DeckbauScreenState extends State<DeckbauScreen> {
   late List<Karte> _deck;
   late final List<Karte> _auswaehlbar;
+  Kategorie? _filter;
+  int _deckSeite = 0;
+  int _poolSeite = 0;
 
   @override
   void initState() {
@@ -39,6 +53,9 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
       });
   }
 
+  List<Karte> get _gefiltert =>
+      _filter == null ? _auswaehlbar : _auswaehlbar.where((k) => k.kategorie == _filter).toList();
+
   int _anzahlImDeck(Karte karte) => _deck.where((k) => k.id == karte.id).length;
 
   bool _kannHinzufuegen(Karte karte) => _anzahlImDeck(karte) < karte.anzahlImDeckMax;
@@ -47,6 +64,18 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
     if (!_kannHinzufuegen(karte)) return;
     setState(() => _deck.add(karte));
   }
+
+  void _entfernenNachIndex(int index) => setState(() => _deck.removeAt(index));
+
+  void _entfernenErsteVorkommen(Karte karte) => setState(() {
+    final index = _deck.indexWhere((k) => k.id == karte.id);
+    if (index != -1) _deck.removeAt(index);
+  });
+
+  void _filterSetzen(Kategorie? kategorie) => setState(() {
+    _filter = kategorie;
+    _poolSeite = 0;
+  });
 
   void _zufaelligFuellen() {
     final aufbau = baueZufaelligesDeck(
@@ -66,108 +95,140 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Deck gespeichert.')));
   }
 
-  void _deckDurchblaettern() {
-    showDialog<void>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => Dialog(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Dein Deck (${_deck.length})', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: KartenWidget.hoeheFuer(180, KartenAnsicht.voll) + 24,
-                  child: _deck.isEmpty
-                      ? const Center(child: Text('Noch keine Karten im Deck.'))
-                      : ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _deck.length,
-                          itemBuilder: (context, index) {
-                            final karte = _deck[index];
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
-                              child: Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  KartenWidget.handkarte(karte, breite: 180, ansicht: KartenAnsicht.voll),
-                                  Positioned(
-                                    top: -8,
-                                    right: -8,
-                                    child: _EntfernenKnopf(
-                                      onTap: () {
-                                        setState(() => _deck.removeAt(index));
-                                        setDialogState(() {});
-                                      },
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                ),
-                const SizedBox(height: 8),
-                TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Schließen')),
-              ],
-            ),
-          ),
-        ),
+  Widget _deckKarteBauen(Karte karte, double breite) {
+    final inhalt = KartenWidget.handkarte(karte, breite: breite, ansicht: KartenAnsicht.voll);
+    // LongPressDraggable statt Draggable: dessen Erkennung lehnt sich aktiv
+    // ab, sobald sich der Finger vor Ablauf der Wartezeit bewegt (Flutter-
+    // intern DelayedMultiDragGestureRecognizer.checkForResolutionAfterMove),
+    // und gibt die Geste damit sauber an die PageView-Wischgeste weiter. Ein
+    // normaler Draggable (auch mit `axis`) löst sich dagegen nie aktiv, "gewinnt"
+    // dadurch trotzdem gegen das Karussell und blockiert jedes Blättern.
+    return LongPressDraggable<_Zug>(
+      data: _Zug(karte, ausDeck: true),
+      feedback: Material(color: Colors.transparent, child: inhalt),
+      childWhenDragging: Opacity(opacity: 0.3, child: inhalt),
+      child: inhalt,
+    );
+  }
+
+  Widget _poolKarteBauen(Karte karte, double breite) {
+    final anzahl = _anzahlImDeck(karte);
+    final kann = _kannHinzufuegen(karte);
+    final inhalt = KartenWidget.handkarte(karte, breite: breite, ansicht: KartenAnsicht.voll);
+    final mitZaehler = Opacity(
+      opacity: kann ? 1.0 : 0.45,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          inhalt,
+          Positioned(top: -8, right: -8, child: _Zaehler(anzahl: anzahl, max: karte.anzahlImDeckMax)),
+        ],
       ),
     );
+    if (!kann) return mitZaehler;
+    return LongPressDraggable<_Zug>(
+      data: _Zug(karte, ausDeck: false),
+      feedback: Material(color: Colors.transparent, child: inhalt),
+      childWhenDragging: Opacity(opacity: 0.3, child: mitZaehler),
+      child: mitZaehler,
+    );
+  }
+
+  /// Kartenbreite und PageView-[viewportFraction] so, dass links und rechts
+  /// der mittleren Karte echte Nachbarn hereinragen (Coverflow-Gefühl) —
+  /// beides aus der verfügbaren Fläche errechnet statt fest verdrahtet,
+  /// sonst verschwinden die Nachbarn auf breiten Bildschirmen komplett
+  /// hinter dem Bildschirmrand.
+  ({double breite, double viewportFraction}) _coverflowMasse(BoxConstraints grenzen) {
+    final breite = ((grenzen.maxHeight - 20) / 1.5).clamp(110.0, 200.0);
+    final viewportFraction = ((breite * 1.35) / grenzen.maxWidth).clamp(0.22, 0.6);
+    return (breite: breite, viewportFraction: viewportFraction);
   }
 
   @override
   Widget build(BuildContext context) {
     final fehler = pruefeDeck(_deck);
     final evilAnzahl = _deck.where((k) => k.kategorie == Kategorie.evil).length;
-    // Zuletzt hinzugefügte Karte obenauf, wie beim Bauen im echten Spiel
-    // (REGELWERK D3: neue Karte kommt immer obenauf).
-    final deckFeld = Spielfeld([for (final k in _deck.reversed) Kartenlage(k)]);
+    final gefiltert = _gefiltert;
+    final deckSeite = _deck.isEmpty ? 0 : _deckSeite.clamp(0, _deck.length - 1);
+    final poolSeite = gefiltert.isEmpty ? 0 : _poolSeite.clamp(0, gefiltert.length - 1);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Eigenes Deck')),
       body: Column(
         children: [
           _StatusLeiste(gesamt: _deck.length, evil: evilAnzahl, fehler: fehler),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: GestureDetector(
-              onTap: _deck.isEmpty ? null : _deckDurchblaettern,
-              child: DragTarget<Karte>(
-                onWillAcceptWithDetails: (d) => _kannHinzufuegen(d.data),
-                onAcceptWithDetails: (d) => _hinzufuegen(d.data),
-                builder: (context, kandidaten, _) => Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: kandidaten.isNotEmpty ? Colors.amber : Colors.transparent,
-                      width: 3,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: StapelWidget(feld: deckFeld, breite: 150, ansicht: KartenAnsicht.voll),
-                ),
+          const _Ueberschrift('Dein Deck — Karte aus dem Pool hierher ziehen'),
+          Expanded(
+            child: DragTarget<_Zug>(
+              key: const ValueKey('deck-dragtarget'),
+              onWillAcceptWithDetails: (d) => !d.data.ausDeck && _kannHinzufuegen(d.data.karte),
+              onAcceptWithDetails: (d) => _hinzufuegen(d.data.karte),
+              builder: (context, kandidaten, _) => _Rahmen(
+                hervorgehoben: kandidaten.isNotEmpty,
+                child: _deck.isEmpty
+                    ? const Center(child: Text('Noch keine Karten im Deck.'))
+                    : LayoutBuilder(
+                        builder: (context, grenzen) {
+                          final masse = _coverflowMasse(grenzen);
+                          return _KartenCoverflow(
+                            karten: _deck,
+                            viewportFraction: masse.viewportFraction,
+                            kartenBauen: (karte) => _deckKarteBauen(karte, masse.breite),
+                            onSeiteGeaendert: (i) => setState(() => _deckSeite = i),
+                          );
+                        },
+                      ),
               ),
             ),
           ),
-          Text(
-            _deck.isEmpty
-                ? 'Dein Deck — Karte hierher ziehen'
-                : 'Dein Deck — antippen zum Durchblättern, Karte hierher ziehen',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+          if (_deck.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: OutlinedButton.icon(
+                onPressed: () => _entfernenNachIndex(deckSeite),
+                icon: const Icon(Icons.remove_circle_outline),
+                label: const Text('Aus dem Deck entfernen'),
+              ),
+            ),
           const Divider(height: 16),
+          const _Ueberschrift('Kartenpool — antippen und ins Deck ziehen'),
+          _KategorieFilter(aktuell: _filter, onGewaehlt: _filterSetzen),
           Expanded(
-            child: _PoolBrowser(
-              karten: _auswaehlbar,
-              anzahlImDeck: _anzahlImDeck,
-              kannHinzufuegen: _kannHinzufuegen,
-              onHinzufuegen: _hinzufuegen,
+            child: DragTarget<_Zug>(
+              key: const ValueKey('pool-dragtarget'),
+              onWillAcceptWithDetails: (d) => d.data.ausDeck,
+              onAcceptWithDetails: (d) => _entfernenErsteVorkommen(d.data.karte),
+              builder: (context, kandidaten, _) => _Rahmen(
+                hervorgehoben: kandidaten.isNotEmpty,
+                child: gefiltert.isEmpty
+                    ? const Center(child: Text('Keine Karten in dieser Kategorie.'))
+                    : LayoutBuilder(
+                        builder: (context, grenzen) {
+                          final masse = _coverflowMasse(grenzen);
+                          return _KartenCoverflow(
+                            key: ValueKey(_filter),
+                            karten: gefiltert,
+                            viewportFraction: masse.viewportFraction,
+                            kartenBauen: (karte) => _poolKarteBauen(karte, masse.breite),
+                            onSeiteGeaendert: (i) => setState(() => _poolSeite = i),
+                          );
+                        },
+                      ),
+              ),
             ),
           ),
+          if (gefiltert.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: FilledButton.tonalIcon(
+                onPressed: _kannHinzufuegen(gefiltert[poolSeite])
+                    ? () => _hinzufuegen(gefiltert[poolSeite])
+                    : null,
+                icon: const Icon(Icons.add_circle_outline),
+                label: const Text('Zum Deck hinzufügen'),
+              ),
+            ),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -190,18 +251,33 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
   }
 }
 
-class _EntfernenKnopf extends StatelessWidget {
-  final VoidCallback onTap;
-  const _EntfernenKnopf({required this.onTap});
+class _Rahmen extends StatelessWidget {
+  final bool hervorgehoben;
+  final Widget child;
+  const _Rahmen({required this.hervorgehoben, required this.child});
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: const CircleAvatar(
-      radius: 14,
-      backgroundColor: Colors.black87,
-      child: Icon(Icons.close, size: 16, color: Colors.white),
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      border: Border.all(
+        color: hervorgehoben ? Colors.amber : Colors.transparent,
+        width: 3,
+      ),
     ),
+    child: child,
+  );
+}
+
+class _Ueberschrift extends StatelessWidget {
+  final String text;
+  const _Ueberschrift(this.text);
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+    child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
   );
 }
 
@@ -235,125 +311,6 @@ class _StatusLeiste extends StatelessWidget {
   );
 }
 
-/// Ein Kartenpool zum Durchblättern statt Durchscrollen: eine Kategorie
-/// filtern, dann eine Karte nach der anderen ansehen ([PageView], mit
-/// wischbarer Stapel-Optik) und per Drag auf den Deck-Stapel ziehen.
-class _PoolBrowser extends StatefulWidget {
-  final List<Karte> karten;
-  final int Function(Karte) anzahlImDeck;
-  final bool Function(Karte) kannHinzufuegen;
-  final void Function(Karte) onHinzufuegen;
-
-  const _PoolBrowser({
-    required this.karten,
-    required this.anzahlImDeck,
-    required this.kannHinzufuegen,
-    required this.onHinzufuegen,
-  });
-
-  @override
-  State<_PoolBrowser> createState() => _PoolBrowserState();
-}
-
-class _PoolBrowserState extends State<_PoolBrowser> {
-  Kategorie? _filter;
-  late PageController _controller;
-  int _seite = 0;
-
-  List<Karte> get _gefiltert =>
-      _filter == null ? widget.karten : widget.karten.where((k) => k.kategorie == _filter).toList();
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = PageController();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _filterSetzen(Kategorie? kategorie) {
-    setState(() {
-      _filter = kategorie;
-      _seite = 0;
-    });
-    _controller = PageController();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final karten = _gefiltert;
-    return Column(
-      children: [
-        _KategorieFilter(aktuell: _filter, onGewaehlt: _filterSetzen),
-        Expanded(
-          child: karten.isEmpty
-              ? const Center(child: Text('Keine Karten in dieser Kategorie.'))
-              : LayoutBuilder(
-                  builder: (context, grenzen) {
-                    // Feste Zuschläge abziehen, bevor aus der Höhe eine
-                    // Kartenbreite (Verhältnis 1:1.5, KartenAnsicht.voll)
-                    // errechnet wird: Stapel-Optik-Rand (16) + Abstand zum
-                    // Knopf (4) + Knopfhöhe (~48).
-                    final breite = ((grenzen.maxHeight - 68) / 1.5).clamp(120.0, 240.0);
-                    return PageView.builder(
-                      key: ValueKey(_filter),
-                      controller: _controller,
-                      itemCount: karten.length,
-                      onPageChanged: (i) => setState(() => _seite = i),
-                      itemBuilder: (context, index) {
-                        final karte = karten[index];
-                        return Center(
-                          child: SingleChildScrollView(
-                            child: _GrosseKarteMitStapelOptik(
-                              karte: karte,
-                              breite: breite,
-                              anzahl: widget.anzahlImDeck(karte),
-                              kannHinzufuegen: widget.kannHinzufuegen(karte),
-                              onHinzufuegen: () => widget.onHinzufuegen(karte),
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.chevron_left),
-                onPressed: _seite > 0
-                    ? () => _controller.previousPage(
-                        duration: const Duration(milliseconds: 200),
-                        curve: Curves.easeOut,
-                      )
-                    : null,
-              ),
-              Text(karten.isEmpty ? '0 / 0' : '${_seite + 1} / ${karten.length}'),
-              IconButton(
-                icon: const Icon(Icons.chevron_right),
-                onPressed: _seite < karten.length - 1
-                    ? () => _controller.nextPage(
-                        duration: const Duration(milliseconds: 200),
-                        curve: Curves.easeOut,
-                      )
-                    : null,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _KategorieFilter extends StatelessWidget {
   final Kategorie? aktuell;
   final void Function(Kategorie?) onGewaehlt;
@@ -384,98 +341,58 @@ class _KategorieFilter extends StatelessWidget {
   );
 }
 
-/// Die aktuell durchblätterte Karte in [KartenAnsicht.voll], mit zwei
-/// versetzten, angedeuteten Karten dahinter — die Stapel-Optik, die eine
-/// simple Scroll-Liste nicht vermitteln kann. Ziehbar auf den Deck-Stapel;
-/// der Knopf darunter ist die alternative Bedienung ohne Drag.
-class _GrosseKarteMitStapelOptik extends StatelessWidget {
-  final Karte karte;
-  final double breite;
-  final int anzahl;
-  final bool kannHinzufuegen;
-  final VoidCallback onHinzufuegen;
+/// CoverFlow-Karussell: die mittlere Karte in voller Größe, Nachbarn kleiner
+/// und blasser — wischbar wie bei Apples klassischem Coverflow, statt einer
+/// starren Liste. [kartenBauen] liefert den (ggf. ziehbaren) Karteninhalt.
+class _KartenCoverflow extends StatefulWidget {
+  final List<Karte> karten;
+  final Widget Function(Karte) kartenBauen;
+  final double viewportFraction;
+  final ValueChanged<int>? onSeiteGeaendert;
 
-  const _GrosseKarteMitStapelOptik({
-    required this.karte,
-    required this.breite,
-    required this.anzahl,
-    required this.kannHinzufuegen,
-    required this.onHinzufuegen,
+  const _KartenCoverflow({
+    super.key,
+    required this.karten,
+    required this.kartenBauen,
+    required this.viewportFraction,
+    this.onSeiteGeaendert,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final hoehe = KartenWidget.hoeheFuer(breite, KartenAnsicht.voll);
-    final karteWidget = KartenWidget.handkarte(karte, breite: breite, ansicht: KartenAnsicht.voll);
-
-    final vorschau = Opacity(
-      opacity: kannHinzufuegen ? 1.0 : 0.45,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.topCenter,
-        children: [
-          karteWidget,
-          Positioned(top: -8, right: -8, child: _Zaehler(anzahl: anzahl, max: karte.anzahlImDeckMax)),
-        ],
-      ),
-    );
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          width: breite + 24,
-          height: hoehe + 16,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Transform.translate(
-                offset: const Offset(9, 9),
-                child: Transform.rotate(
-                  angle: 0.07,
-                  child: _StapelSchatten(breite: breite, hoehe: hoehe, farbe: Colors.indigo.shade200),
-                ),
-              ),
-              Transform.translate(
-                offset: const Offset(-7, 6),
-                child: Transform.rotate(
-                  angle: -0.05,
-                  child: _StapelSchatten(breite: breite, hoehe: hoehe, farbe: Colors.indigo.shade100),
-                ),
-              ),
-              kannHinzufuegen
-                  ? Draggable<Karte>(
-                      data: karte,
-                      feedback: Material(color: Colors.transparent, child: karteWidget),
-                      childWhenDragging: Opacity(opacity: 0.3, child: vorschau),
-                      child: vorschau,
-                    )
-                  : vorschau,
-            ],
-          ),
-        ),
-        const SizedBox(height: 4),
-        FilledButton.tonal(
-          onPressed: kannHinzufuegen ? onHinzufuegen : null,
-          child: const Text('Zum Deck hinzufügen'),
-        ),
-      ],
-    );
-  }
+  State<_KartenCoverflow> createState() => _KartenCoverflowState();
 }
 
-class _StapelSchatten extends StatelessWidget {
-  final double breite;
-  final double hoehe;
-  final Color farbe;
-
-  const _StapelSchatten({required this.breite, required this.hoehe, required this.farbe});
+class _KartenCoverflowState extends State<_KartenCoverflow> {
+  late final PageController _controller = PageController(viewportFraction: widget.viewportFraction);
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: breite,
-    height: hoehe,
-    decoration: BoxDecoration(color: farbe, borderRadius: BorderRadius.circular(breite / 14)),
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => PageView.builder(
+    controller: _controller,
+    itemCount: widget.karten.length,
+    onPageChanged: widget.onSeiteGeaendert,
+    itemBuilder: (context, index) => AnimatedBuilder(
+      animation: _controller,
+      builder: (context, kind) {
+        final aktuelleSeite =
+            _controller.hasClients && _controller.position.haveDimensions
+            ? (_controller.page ?? index.toDouble())
+            : index.toDouble();
+        final abstand = (aktuelleSeite - index).abs().clamp(0.0, 1.0);
+        return Center(
+          child: Opacity(
+            opacity: 1 - abstand * 0.55,
+            child: Transform.scale(scale: 1 - abstand * 0.35, child: kind),
+          ),
+        );
+      },
+      child: widget.kartenBauen(widget.karten[index]),
+    ),
   );
 }
 
