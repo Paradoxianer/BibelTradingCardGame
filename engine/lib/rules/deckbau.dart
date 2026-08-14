@@ -6,8 +6,9 @@ const int kEvilAnzahlImDeck = 7;
 
 /// Baut zufällig ein regelkonformes 35-Karten-Deck (REGELWERK §2): 7
 /// unterschiedliche Evil-Karten + 28 Ressourcenkarten (Wiederholungen bis
-/// `anzahlImDeckMax`). Genutzt von App (Hotseat-Prototyp) und Simulator —
-/// ein echter Deckbau-Screen ist ROADMAP Phase 3.
+/// `anzahlImDeckMax`). Genutzt von Simulator, Bot-Gegner und als
+/// Schnellstart-Fallback in der App, wenn (noch) kein eigenes Deck
+/// gespeichert ist (Deckbau-Screen, Issue #17).
 SpielerAufbau baueZufaelligesDeck({
   required String id,
   required String name,
@@ -40,4 +41,44 @@ SpielerAufbau baueZufaelligesDeck({
   ];
 
   return SpielerAufbau(id: id, name: name, deck: deck, eStart: eStart);
+}
+
+/// Prüft ein selbst zusammengestelltes Deck gegen REGELWERK §2. Leere Liste
+/// heißt gültig — sonst je Verstoß ein für Spieler:innen lesbarer Satz, damit
+/// der Deckbau-Screen sie direkt anzeigen kann.
+List<String> pruefeDeck(List<Karte> deck) {
+  final fehler = <String>[];
+
+  if (deck.any((k) => k.kategorie == Kategorie.start)) {
+    fehler.add('Die Startkarte gehört nicht ins Deck, sie liegt automatisch aus.');
+  }
+
+  final evil = deck.where((k) => k.kategorie == Kategorie.evil).toList();
+  if (evil.length != kEvilAnzahlImDeck) {
+    fehler.add('${evil.length} von genau $kEvilAnzahlImDeck Evil-Karten.');
+  }
+  if (evil.map((k) => k.id).toSet().length != evil.length) {
+    fehler.add('Evil-Karten müssen alle unterschiedlich sein.');
+  }
+
+  final anzahlJeId = <String, int>{};
+  for (final karte in deck) {
+    anzahlJeId[karte.id] = (anzahlJeId[karte.id] ?? 0) + 1;
+  }
+  final karteNachId = {for (final k in deck) k.id: k};
+  for (final eintrag in anzahlJeId.entries) {
+    final karte = karteNachId[eintrag.key]!;
+    if (eintrag.value > karte.anzahlImDeckMax) {
+      fehler.add(
+        '"${karte.name}" ${eintrag.value}× im Deck, erlaubt sind höchstens '
+        '${karte.anzahlImDeckMax}.',
+      );
+    }
+  }
+
+  if (deck.length != kDeckGroesse) {
+    fehler.add('${deck.length} von genau $kDeckGroesse Karten.');
+  }
+
+  return fehler;
 }

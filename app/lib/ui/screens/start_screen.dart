@@ -8,7 +8,9 @@ import 'package:hydrated_bloc/hydrated_bloc.dart';
 
 import '../../bloc/game_bloc.dart';
 import '../../bloc/spiel_persistenz.dart';
+import '../../data/deck_repository.dart';
 import '../../data/kartenset_loader.dart';
+import 'deckbau_screen.dart';
 import 'onboarding_screen.dart';
 import 'spiel_screen.dart';
 
@@ -59,12 +61,7 @@ class _StartScreenState extends State<StartScreen> {
     final random = Random();
     final seed = random.nextInt(1 << 31);
     final aufbauListe = [
-      baueZufaelligesDeck(
-        id: 'p1',
-        name: 'Spieler 1',
-        alleKarten: kartenset.alleKarten,
-        seed: seed,
-      ),
+      _spieler1Aufbau(kartenset, seed),
       baueZufaelligesDeck(
         id: 'p2',
         name: botSpieler.containsKey('p2') ? 'Computer' : 'Spieler 2',
@@ -104,6 +101,28 @@ class _StartScreenState extends State<StartScreen> {
     );
   }
 
+  /// Nutzt das gespeicherte eigene Deck (Issue #17), wenn eines vorhanden und
+  /// gültig ist — sonst wie bisher ein zufälliges Deck als Fallback.
+  SpielerAufbau _spieler1Aufbau(Kartenset kartenset, int seed) {
+    final eigenesDeck = DeckRepository.lade(kartenset.alleKarten);
+    if (eigenesDeck.isNotEmpty && pruefeDeck(eigenesDeck).isEmpty) {
+      final eStart = kartenset.alleKarten.firstWhere((k) => k.kategorie == Kategorie.start);
+      return SpielerAufbau(id: 'p1', name: 'Spieler 1', deck: eigenesDeck, eStart: eStart);
+    }
+    return baueZufaelligesDeck(
+      id: 'p1',
+      name: 'Spieler 1',
+      alleKarten: kartenset.alleKarten,
+      seed: seed,
+    );
+  }
+
+  void _deckBearbeiten(BuildContext context, Kartenset kartenset) {
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => DeckbauScreen(kartenset: kartenset)))
+        .then((_) => setState(() {}));
+  }
+
   void _regelnZeigen(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -138,6 +157,8 @@ class _StartScreenState extends State<StartScreen> {
             }
             final kartenset = snapshot.data!;
             final fortsetzenMoeglich = GameBloc.gespeichertesSpielVorhanden();
+            final eigenesDeck = DeckRepository.lade(kartenset.alleKarten);
+            final eigenesDeckAktiv = eigenesDeck.isNotEmpty && pruefeDeck(eigenesDeck).isEmpty;
             return Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -172,6 +193,19 @@ class _StartScreenState extends State<StartScreen> {
                     botSpieler: const {'p2': GreedyBot()},
                   ),
                   child: const Text('Gegen den Computer spielen'),
+                ),
+                const SizedBox(height: 24),
+                TextButton.icon(
+                  onPressed: () => _deckBearbeiten(context, kartenset),
+                  icon: const Icon(Icons.style_outlined),
+                  label: const Text('Eigenes Deck bearbeiten'),
+                ),
+                Text(
+                  eigenesDeckAktiv
+                      ? 'Eigenes Deck aktiv (${eigenesDeck.length} Karten) — Spieler 1 spielt damit.'
+                      : 'Kein eigenes Deck gespeichert — Spieler 1 bekommt ein zufälliges.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                  textAlign: TextAlign.center,
                 ),
               ],
             );
