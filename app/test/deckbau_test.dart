@@ -34,23 +34,22 @@ Kartenset _kartenset() => Kartenset(
   },
 );
 
-/// Findet die Karte mit [id] im Pool-Karussell (unten) — dort steht der
-/// ganze wählbare Bestand, in Kategorie-Reihenfolge sortiert.
-Finder _imPool(WidgetTester tester, String id) {
-  final finder = find.descendant(
-    of: find.byKey(const ValueKey('pool-karussell')),
-    matching: find.byWidgetPredicate((w) => w is KartenWidget && w.karte?.id == id),
-  );
-  return finder;
-}
+Finder _hinzufuegenKnopf() => find.widgetWithText(FilledButton, 'Zum Deck hinzufügen');
 
 void main() {
   setUp(() => HydratedBloc.storage = SpeicherImArbeitsspeicher());
 
-  testWidgets('Zufällig füllen ergibt ein gültiges Deck, Speichern legt es ab', (tester) async {
-    final kartenset = _kartenset();
+  Future<void> pumpScreen(WidgetTester tester, Kartenset kartenset) async {
+    tester.view.physicalSize = const Size(900, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(MaterialApp(home: DeckbauScreen(kartenset: kartenset)));
     await tester.pump();
+  }
+
+  testWidgets('Zufällig füllen ergibt ein gültiges Deck, Speichern legt es ab', (tester) async {
+    final kartenset = _kartenset();
+    await pumpScreen(tester, kartenset);
 
     expect(find.text('Deck ist gültig.'), findsNothing);
 
@@ -68,53 +67,77 @@ void main() {
     expect(gespeichert.where((k) => k.kategorie == Kategorie.evil).length, 7);
   });
 
-  testWidgets('Karten im Pool antippen fügt sie dem Deck-Karussell hinzu; im Deck antippen entfernt sie', (
+  testWidgets('Erste Pool-Karte (r0) steht offen zum Durchblättern da, Knopf fügt sie hinzu', (
     tester,
   ) async {
     final kartenset = _kartenset();
-    await tester.pumpWidget(MaterialApp(home: DeckbauScreen(kartenset: kartenset)));
-    await tester.pump();
+    await pumpScreen(tester, kartenset);
 
     expect(find.text('0/35 Karten · 0/7 Evil'), findsOneWidget);
-    expect(find.text('Noch keine Karten im Deck.'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate((w) => w is KartenWidget && w.karte?.id == 'r0'),
+      findsOneWidget,
+      reason: 'r0 ist die erste Karte im sortierten Pool und steht ohne Blättern da',
+    );
 
-    // r0 steht als erste Karte direkt sichtbar im Pool-Karussell.
-    await tester.tap(_imPool(tester, 'r0'));
+    await tester.tap(_hinzufuegenKnopf());
     await tester.pump();
 
     expect(find.text('1/35 Karten · 0/7 Evil'), findsOneWidget);
-    expect(find.text('Noch keine Karten im Deck.'), findsNothing);
+  });
 
-    // Dieselbe Karte steht jetzt auch im Deck-Karussell (oben) — antippen
-    // dort entfernt sie wieder.
-    final imDeck = find.descendant(
-      of: find.byKey(const ValueKey('deck-karussell')),
-      matching: find.byWidgetPredicate((w) => w is KartenWidget && w.karte?.id == 'r0'),
-    );
-    expect(imDeck, findsOneWidget);
-    await tester.tap(imDeck);
+  testWidgets('Ziehen der aktuellen Pool-Karte auf den Deck-Stapel fügt sie hinzu', (tester) async {
+    final kartenset = _kartenset();
+    await pumpScreen(tester, kartenset);
+
+    final r0 = find.byWidgetPredicate((w) => w is Draggable<Karte> && w.data?.id == 'r0');
+    final deckStapel = find.byType(StapelWidget);
+    expect(r0, findsOneWidget);
+    expect(deckStapel, findsOneWidget);
+
+    final geste = await tester.startGesture(tester.getCenter(r0));
+    await tester.pump(const Duration(milliseconds: 50));
+    await geste.moveTo(tester.getCenter(deckStapel));
+    await tester.pump(const Duration(milliseconds: 50));
+    await geste.up();
+    await tester.pumpAndSettle();
+
+    expect(find.text('1/35 Karten · 0/7 Evil'), findsOneWidget);
+  });
+
+  testWidgets('Deck antippen öffnet den Durchblättern-Dialog, X entfernt eine Karte', (tester) async {
+    final kartenset = _kartenset();
+    await pumpScreen(tester, kartenset);
+
+    await tester.tap(_hinzufuegenKnopf());
+    await tester.pump();
+    expect(find.text('1/35 Karten · 0/7 Evil'), findsOneWidget);
+
+    await tester.tap(find.byType(StapelWidget));
+    await tester.pumpAndSettle();
+    expect(find.text('Dein Deck (1)'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.close));
     await tester.pump();
 
-    expect(find.text('0/35 Karten · 0/7 Evil'), findsOneWidget);
+    expect(find.text('Dein Deck (0)'), findsOneWidget);
+    expect(find.text('0/35 Karten · 0/7 Evil'), findsOneWidget, reason: 'Entfernen wirkt auch auf den Hintergrund');
   });
 
   testWidgets('Evil-Karten lassen sich nicht doppelt hinzufügen (anzahlImDeckMax 1)', (tester) async {
     final kartenset = _kartenset();
-    await tester.pumpWidget(MaterialApp(home: DeckbauScreen(kartenset: kartenset)));
-    await tester.pump();
+    await pumpScreen(tester, kartenset);
 
-    // e0 steht in der Evil-Sektion weit rechts im Pool-Karussell.
-    final e0 = _imPool(tester, 'e0');
-    await tester.dragUntilVisible(e0, find.byKey(const ValueKey('pool-karussell')), const Offset(-400, 0));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Evil'));
+    await tester.pumpAndSettle();
 
-    await tester.tap(e0);
-    await tester.pump();
-    expect(find.text('1/35 Karten · 1/7 Evil'), findsOneWidget);
+    expect(find.byWidgetPredicate((w) => w is KartenWidget && w.karte?.id == 'e0'), findsOneWidget);
 
-    // Nochmal tippen darf nichts ändern — Max für Evil-Karten ist 1, die
-    // Karte ist jetzt abgeblendet und ohne onTap.
-    await tester.tap(e0, warnIfMissed: false);
+    await tester.tap(_hinzufuegenKnopf());
     await tester.pump();
     expect(find.text('1/35 Karten · 1/7 Evil'), findsOneWidget);
+
+    final knopf = tester.widget<FilledButton>(_hinzufuegenKnopf());
+    expect(knopf.onPressed, isNull, reason: 'e0 steckt schon einmal im Deck, Max ist 1');
   });
 }
