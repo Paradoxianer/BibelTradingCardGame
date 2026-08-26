@@ -39,6 +39,7 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
   late List<Karte> _deck;
   late final List<Karte> _auswaehlbar;
   Kategorie? _filter;
+  _Sortierung _sortierung = _Sortierung.kategorie;
   int _deckSeite = 0;
   int _poolSeite = 0;
 
@@ -53,8 +54,17 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
       });
   }
 
-  List<Karte> get _gefiltert =>
-      _filter == null ? _auswaehlbar : _auswaehlbar.where((k) => k.kategorie == _filter).toList();
+  List<Karte> get _gefiltert {
+    final basis = _filter == null ? _auswaehlbar : _auswaehlbar.where((k) => k.kategorie == _filter).toList();
+    final slotIndex = _sortierung.slotIndex;
+    if (slotIndex == null) return basis; // _auswaehlbar ist schon Kategorie+Name sortiert
+    return List<Karte>.of(basis)..sort((a, b) {
+      final wa = _slotSortWert(a.slots[slotIndex]);
+      final wb = _slotSortWert(b.slots[slotIndex]);
+      // Absteigend: das beste Slot-Symbol an der gewählten Stelle zuerst.
+      return wa != wb ? wb.compareTo(wa) : a.name.compareTo(b.name);
+    });
+  }
 
   int _anzahlImDeck(Karte karte) => _deck.where((k) => k.id == karte.id).length;
 
@@ -77,6 +87,11 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
     _poolSeite = 0;
   });
 
+  void _sortierungSetzen(_Sortierung sortierung) => setState(() {
+    _sortierung = sortierung;
+    _poolSeite = 0;
+  });
+
   void _zufaelligFuellen() {
     final aufbau = baueZufaelligesDeck(
       id: 'vorschlag',
@@ -95,8 +110,11 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Deck gespeichert.')));
   }
 
-  Widget _deckKarteBauen(Karte karte, double breite) {
-    final inhalt = KartenWidget.handkarte(karte, breite: breite, ansicht: KartenAnsicht.voll);
+  Widget _deckKarteBauen(Karte karte) {
+    // breite: null — die Karte füllt selbst die Fläche, die ihr das
+    // CoverFlow-Karussell gibt, ohne dass hier nachgerechnet werden muss
+    // (KartenWidget kennt als einzige Stelle das feste Seitenverhältnis).
+    final inhalt = KartenWidget.handkarte(karte, breite: null, ansicht: KartenAnsicht.voll);
     // LongPressDraggable statt Draggable: dessen Erkennung lehnt sich aktiv
     // ab, sobald sich der Finger vor Ablauf der Wartezeit bewegt (Flutter-
     // intern DelayedMultiDragGestureRecognizer.checkForResolutionAfterMove),
@@ -111,10 +129,10 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
     );
   }
 
-  Widget _poolKarteBauen(Karte karte, double breite) {
+  Widget _poolKarteBauen(Karte karte) {
     final anzahl = _anzahlImDeck(karte);
     final kann = _kannHinzufuegen(karte);
-    final inhalt = KartenWidget.handkarte(karte, breite: breite, ansicht: KartenAnsicht.voll);
+    final inhalt = KartenWidget.handkarte(karte, breite: null, ansicht: KartenAnsicht.voll);
     final mitZaehler = Opacity(
       opacity: kann ? 1.0 : 0.45,
       child: Stack(
@@ -134,16 +152,13 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
     );
   }
 
-  /// Kartenbreite und PageView-[viewportFraction] so, dass links und rechts
-  /// der mittleren Karte echte Nachbarn hereinragen (Coverflow-Gefühl) —
-  /// beides aus der verfügbaren Fläche errechnet statt fest verdrahtet,
-  /// sonst verschwinden die Nachbarn auf breiten Bildschirmen komplett
-  /// hinter dem Bildschirmrand.
-  ({double breite, double viewportFraction}) _coverflowMasse(BoxConstraints grenzen) {
-    final breite = ((grenzen.maxHeight - 20) / 1.5).clamp(110.0, 200.0);
-    final viewportFraction = ((breite * 1.35) / grenzen.maxWidth).clamp(0.22, 0.6);
-    return (breite: breite, viewportFraction: viewportFraction);
-  }
+  /// Bewusst konstant: der PageController in [_KartenCoverflow] wird nicht
+  /// neu aufgebaut, wenn sich die Fläche ändert (z. B. beim Skalieren des
+  /// Browserfensters). Eine aus der Fläche abgeleitete Fraction lief dadurch
+  /// mit dem Fenster auseinander. Wie groß die Karte selbst innerhalb ihres
+  /// Ausschnitts wird, rechnet [KartenWidget] jetzt allein aus (`breite:
+  /// null`) — hier geht es nur noch darum, wie viel Nachbarn hereinragen.
+  static const double _kViewportFraction = 0.42;
 
   @override
   Widget build(BuildContext context) {
@@ -168,16 +183,11 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
                 hervorgehoben: kandidaten.isNotEmpty,
                 child: _deck.isEmpty
                     ? const Center(child: Text('Noch keine Karten im Deck.'))
-                    : LayoutBuilder(
-                        builder: (context, grenzen) {
-                          final masse = _coverflowMasse(grenzen);
-                          return _KartenCoverflow(
-                            karten: _deck,
-                            viewportFraction: masse.viewportFraction,
-                            kartenBauen: (karte) => _deckKarteBauen(karte, masse.breite),
-                            onSeiteGeaendert: (i) => setState(() => _deckSeite = i),
-                          );
-                        },
+                    : _KartenCoverflow(
+                        karten: _deck,
+                        viewportFraction: _kViewportFraction,
+                        kartenBauen: _deckKarteBauen,
+                        onSeiteGeaendert: (i) => setState(() => _deckSeite = i),
                       ),
               ),
             ),
@@ -193,7 +203,12 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
             ),
           const Divider(height: 16),
           const _Ueberschrift('Kartenpool — antippen und ins Deck ziehen'),
-          _KategorieFilter(aktuell: _filter, onGewaehlt: _filterSetzen),
+          Row(
+            children: [
+              Expanded(child: _KategorieFilter(aktuell: _filter, onGewaehlt: _filterSetzen)),
+              _SortierMenu(aktuell: _sortierung, onGewaehlt: _sortierungSetzen),
+            ],
+          ),
           Expanded(
             child: DragTarget<_Zug>(
               key: const ValueKey('pool-dragtarget'),
@@ -203,17 +218,12 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
                 hervorgehoben: kandidaten.isNotEmpty,
                 child: gefiltert.isEmpty
                     ? const Center(child: Text('Keine Karten in dieser Kategorie.'))
-                    : LayoutBuilder(
-                        builder: (context, grenzen) {
-                          final masse = _coverflowMasse(grenzen);
-                          return _KartenCoverflow(
-                            key: ValueKey(_filter),
-                            karten: gefiltert,
-                            viewportFraction: masse.viewportFraction,
-                            kartenBauen: (karte) => _poolKarteBauen(karte, masse.breite),
-                            onSeiteGeaendert: (i) => setState(() => _poolSeite = i),
-                          );
-                        },
+                    : _KartenCoverflow(
+                        key: ValueKey(_filter),
+                        karten: gefiltert,
+                        viewportFraction: _kViewportFraction,
+                        kartenBauen: _poolKarteBauen,
+                        onSeiteGeaendert: (i) => setState(() => _poolSeite = i),
                       ),
               ),
             ),
@@ -414,5 +424,58 @@ class _Zaehler extends StatelessWidget {
       '$anzahl/$max',
       style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold),
     ),
+  );
+}
+
+/// Sortierkriterium für den Pool. `slotIndex` ist `null` für die
+/// Standardsortierung (Kategorie, dann Name); sonst der Index in
+/// [Karte.slots] (Reihenfolge V1,V2,S1,S2,HG1,HG2, KARTEN_SPEZIFIKATION §2).
+///
+/// "Stärke" (Marginal-Contribution-Analyse aus `tools/simulator/bin/
+/// kartenstaerke.dart`) fehlt hier bewusst — dieser Wert wird bisher nur in
+/// der Simulation berechnet, nicht als Kartenfeld in der App ausgeliefert,
+/// bräuchte also eine eigene Daten-Pipeline statt nur eine Sortierfunktion.
+enum _Sortierung {
+  kategorie('Kategorie', null),
+  v1('Nach V1', 0),
+  v2('Nach V2', 1),
+  s1('Nach S1', 2),
+  s2('Nach S2', 3),
+  hg1('Nach HG1', 4),
+  hg2('Nach HG2', 5);
+
+  final String label;
+  final int? slotIndex;
+  const _Sortierung(this.label, this.slotIndex);
+}
+
+/// Einheitliche Vergleichsgröße für ein Slot-Symbol: ein Loch gilt als das
+/// wertvollste Symbol (deckt beliebige Werte darunter auf), danach absteigend
+/// nach Farbwert, ein schwarzer Wert zuletzt (zählt immer negativ).
+int _slotSortWert(SlotSymbol symbol) => switch (symbol) {
+  Loch() => 3,
+  Farbig(wert: final w) => w,
+  Schwarz() => -1,
+};
+
+/// Kompaktes Sortiermenü — ein einzelnes Icon statt einer Zeile voller
+/// Optionen, damit auf kleinen Bildschirmen kein zusätzlicher Platz für
+/// Sortierkriterien reserviert werden muss.
+class _SortierMenu extends StatelessWidget {
+  final _Sortierung aktuell;
+  final ValueChanged<_Sortierung> onGewaehlt;
+
+  const _SortierMenu({required this.aktuell, required this.onGewaehlt});
+
+  @override
+  Widget build(BuildContext context) => PopupMenuButton<_Sortierung>(
+    initialValue: aktuell,
+    onSelected: onGewaehlt,
+    icon: const Icon(Icons.sort),
+    tooltip: 'Sortieren',
+    itemBuilder: (context) => [
+      for (final s in _Sortierung.values)
+        CheckedPopupMenuItem(value: s, checked: s == aktuell, child: Text(s.label)),
+    ],
   );
 }

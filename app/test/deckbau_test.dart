@@ -23,6 +23,20 @@ Karte _karte(String id, {Kategorie kategorie = Kategorie.gebet, int max = 3}) =>
   pictureLink: '',
 );
 
+Karte _karteMitV1(String id, String v1Code) => Karte(
+  id: id,
+  cardId: id,
+  name: id,
+  vers: const Vers(stelle: 'X 1,1', text: ''),
+  slots: [v1Code, '0', '0', '0', '0', '0'].map(SlotSymbol.parse).toList(),
+  kategorie: Kategorie.gebet,
+  seltenheit: 'haeufig',
+  sofort: false,
+  effekt: null,
+  anzahlImDeckMax: 3,
+  pictureLink: '',
+);
+
 Kartenset _kartenset() => Kartenset(
   set: 'TEST',
   version: '1.0.0',
@@ -200,5 +214,42 @@ void main() {
 
     final knopf = tester.widget<ButtonStyleButton>(_hinzufuegenKnopf());
     expect(knopf.onPressed, isNull, reason: 'e0 steckt schon einmal im Deck, Max ist 1');
+  });
+
+  testWidgets('Sortiermenü ordnet den Pool nach dem gewählten Slot statt nach Name', (tester) async {
+    final kartenset = Kartenset(
+      set: 'TEST',
+      version: '1.0.0',
+      tabs: {
+        'R_Test': [
+          _karteMitV1('aaa_schwach', '-1'), // schlechtestes Symbol, aber alphabetisch zuerst
+          _karteMitV1('bbb_null', '0'),
+          _karteMitV1('ccc_stark', '2'),
+          _karteMitV1('ddd_loch', 'x'), // bestes Symbol an V1, alphabetisch zuletzt
+        ],
+      },
+    );
+    await pumpScreen(tester, kartenset);
+
+    expect(
+      find.byWidgetPredicate((w) => w is KartenWidget && w.karte?.id == 'aaa_schwach'),
+      findsOneWidget,
+      reason: 'Standardsortierung ist Kategorie/Name',
+    );
+
+    await tester.tap(find.byIcon(Icons.sort));
+    await tester.pumpAndSettle();
+    // warnIfMissed: false — PopupMenuButton positioniert seine Overlay-Items
+    // in Tests knapp außerhalb der von getCenter() berechneten Trefferzone
+    // (bekannte Flutter-Test-Eigenart), der Tap kommt trotzdem an.
+    await tester.tap(find.text('Nach V1'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byWidgetPredicate((w) => w is KartenWidget && w.karte?.id == 'ddd_loch'),
+      findsOneWidget,
+      reason: 'Ein Loch an V1 gilt als bestes Symbol und steht nach der Sortierung zentriert',
+    );
+    expect(find.byWidgetPredicate((w) => w is KartenWidget && w.karte?.id == 'aaa_schwach'), findsNothing);
   });
 }

@@ -56,7 +56,14 @@ class KartenWidget extends StatelessWidget {
   final List<SlotAnzeige> slots;
 
   final KartenAnsicht ansicht;
-  final double breite;
+
+  /// `null` = die Karte füllt die verfügbare Fläche, so groß wie es das
+  /// feste Seitenverhältnis (aus [ansicht]) erlaubt, statt einer festen
+  /// Pixelbreite — die einzige Stelle, die das Seitenverhältnis kennt, damit
+  /// Aufrufer (z. B. ein CoverFlow-Karussell mit sich ändernder Fensterform)
+  /// nicht selbst nachrechnen müssen und dabei aus dem Ruder laufen können.
+  final double? breite;
+
   final bool rueckseite;
 
   const KartenWidget({
@@ -72,7 +79,7 @@ class KartenWidget extends StatelessWidget {
     Karte karte, {
     Key? key,
     KartenAnsicht ansicht = KartenAnsicht.kompakt,
-    double breite = 120,
+    double? breite = 120,
   }) => KartenWidget(
     key: key,
     karte: karte,
@@ -85,7 +92,7 @@ class KartenWidget extends StatelessWidget {
   factory KartenWidget.verdeckt(
     Karte karte, {
     Key? key,
-    double breite = 120,
+    double? breite = 120,
   }) => KartenWidget(
     key: key,
     karte: karte,
@@ -97,15 +104,32 @@ class KartenWidget extends StatelessWidget {
   static double hoeheFuer(double breite, KartenAnsicht ansicht) =>
       ansicht == KartenAnsicht.voll ? breite * 1.5 : breite * 0.92;
 
-  double get _hoehe => hoeheFuer(breite, ansicht);
-  double get _eckenRadius => breite / 14;
-
-  SlotLayout get _layout => SlotLayout.fuerKarte(breite);
-
   @override
   Widget build(BuildContext context) {
+    if (breite != null) return _koerper(context, breite!);
+    return LayoutBuilder(
+      builder: (context, grenzen) => Center(child: _koerper(context, _breiteAus(grenzen))),
+    );
+  }
+
+  /// Größte Breite, bei der sowohl Breite als auch Höhe der Karte (festes
+  /// Verhältnis über [hoeheFuer]) noch in [grenzen] passen — genau das,
+  /// was [AspectRatio] intern tut, nur dass hier die Zahl selbst gebraucht
+  /// wird, weil Schriftgrößen etc. proportional zur Breite gerechnet werden.
+  double _breiteAus(BoxConstraints grenzen) {
+    final ausBreite = grenzen.hasBoundedWidth ? grenzen.maxWidth : double.infinity;
+    final ausHoeheVerfuegbar = grenzen.hasBoundedHeight ? grenzen.maxHeight : double.infinity;
+    final ausHoehe = ausHoeheVerfuegbar / (ansicht == KartenAnsicht.voll ? 1.5 : 0.92);
+    final b = ausBreite < ausHoehe ? ausBreite : ausHoehe;
+    return b.isFinite ? b : 120; // Fallback, falls nichts begrenzt ist
+  }
+
+  Widget _koerper(BuildContext context, double breite) {
+    final hoehe = hoeheFuer(breite, ansicht);
+    final eckenRadius = breite / 14;
+    final layout = SlotLayout.fuerKarte(breite);
     final k = karte;
-    if (k == null) return _LeeresFeld(breite: breite, hoehe: _hoehe);
+    if (k == null) return _LeeresFeld(breite: breite, hoehe: hoehe);
 
     final loecher = [
       for (var i = 0; i < slots.length; i++)
@@ -114,14 +138,14 @@ class KartenWidget extends StatelessWidget {
 
     return SizedBox(
       width: breite,
-      height: _hoehe,
+      height: hoehe,
       // Erst ausstanzen, dann zeichnen: an den Lochstellen ist die Karte
       // wirklich durchsichtig, dort scheint durch, was darunter liegt.
       child: ClipPath(
         clipper: LochStanzung(
           loecher: loecher,
-          layout: _layout,
-          eckenRadius: _eckenRadius,
+          layout: layout,
+          eckenRadius: eckenRadius,
         ),
         // Der Rahmen liegt bewusst NICHT als `border` am Container: ein
         // Border rückt den Inhalt um seine Breite ein, der Clip-Pfad rechnet
@@ -137,13 +161,13 @@ class KartenWidget extends StatelessWidget {
                       karte: k,
                       slots: slots,
                       breite: breite,
-                      layout: _layout,
+                      layout: layout,
                     )
                   : _KompakteKarte(
                       karte: k,
                       slots: slots,
                       breite: breite,
-                      layout: _layout,
+                      layout: layout,
                       rueckseite: rueckseite,
                     ),
             ),
@@ -154,7 +178,7 @@ class KartenWidget extends StatelessWidget {
                     color: seltenheitsFarbe(k.seltenheit),
                     width: breite / 40,
                   ),
-                  borderRadius: BorderRadius.circular(_eckenRadius),
+                  borderRadius: BorderRadius.circular(eckenRadius),
                 ),
               ),
             ),
