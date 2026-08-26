@@ -37,6 +37,20 @@ Karte _karteMitV1(String id, String v1Code) => Karte(
   pictureLink: '',
 );
 
+Karte _karteMitSeltenheit(String id, String seltenheit) => Karte(
+  id: id,
+  cardId: id,
+  name: id,
+  vers: const Vers(stelle: 'X 1,1', text: ''),
+  slots: ['0', '0', '0', '0', '0', '0'].map(SlotSymbol.parse).toList(),
+  kategorie: Kategorie.gebet,
+  seltenheit: seltenheit,
+  sofort: false,
+  effekt: null,
+  anzahlImDeckMax: 3,
+  pictureLink: '',
+);
+
 Kartenset _kartenset() => Kartenset(
   set: 'TEST',
   version: '1.0.0',
@@ -251,5 +265,33 @@ void main() {
       reason: 'Ein Loch an V1 gilt als bestes Symbol und steht nach der Sortierung zentriert',
     );
     expect(find.byWidgetPredicate((w) => w is KartenWidget && w.karte?.id == 'aaa_schwach'), findsNothing);
+  });
+
+  testWidgets('Sortiermenü ordnet den Pool nach Seltenheit', (tester) async {
+    final kartenset = Kartenset(
+      set: 'TEST',
+      version: '1.0.0',
+      tabs: {
+        'R_Test': [
+          _karteMitSeltenheit('aaa_haeufig', 'haeufig'), // alphabetisch zuerst, aber am wenigsten selten
+          _karteMitSeltenheit('bbb_selten', 'selten'),
+          _karteMitSeltenheit('ccc_episch', 'episch'),
+          _karteMitSeltenheit('ddd_einzigartig', 'einzigartig'), // alphabetisch zuletzt, aber am seltensten
+        ],
+      },
+    );
+    await pumpScreen(tester, kartenset);
+
+    await tester.tap(find.byIcon(Icons.sort));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Nach Seltenheit'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byWidgetPredicate((w) => w is KartenWidget && w.karte?.id == 'ddd_einzigartig'),
+      findsOneWidget,
+      reason: 'einzigartig ist die höchste Seltenheitsstufe und steht nach der Sortierung zentriert',
+    );
+    expect(find.byWidgetPredicate((w) => w is KartenWidget && w.karte?.id == 'aaa_haeufig'), findsNothing);
   });
 }

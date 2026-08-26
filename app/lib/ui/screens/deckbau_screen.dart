@@ -56,12 +56,11 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
 
   List<Karte> get _gefiltert {
     final basis = _filter == null ? _auswaehlbar : _auswaehlbar.where((k) => k.kategorie == _filter).toList();
-    final slotIndex = _sortierung.slotIndex;
-    if (slotIndex == null) return basis; // _auswaehlbar ist schon Kategorie+Name sortiert
+    if (_sortierung == _Sortierung.kategorie) return basis; // schon Kategorie+Name sortiert
     return List<Karte>.of(basis)..sort((a, b) {
-      final wa = _slotSortWert(a.slots[slotIndex]);
-      final wb = _slotSortWert(b.slots[slotIndex]);
-      // Absteigend: das beste Slot-Symbol an der gewählten Stelle zuerst.
+      final wa = _sortierung.wertFuer(a)!;
+      final wb = _sortierung.wertFuer(b)!;
+      // Absteigend: der beste Wert beim gewählten Kriterium zuerst.
       return wa != wb ? wb.compareTo(wa) : a.name.compareTo(b.name);
     });
   }
@@ -427,26 +426,40 @@ class _Zaehler extends StatelessWidget {
   );
 }
 
-/// Sortierkriterium für den Pool. `slotIndex` ist `null` für die
-/// Standardsortierung (Kategorie, dann Name); sonst der Index in
-/// [Karte.slots] (Reihenfolge V1,V2,S1,S2,HG1,HG2, KARTEN_SPEZIFIKATION §2).
+/// Sortierkriterium für den Pool. [wertFuer] liefert `null` für die
+/// Standardsortierung (Kategorie, dann Name) — die Ausgangsliste ist schon
+/// so sortiert, dann wird gar nicht erst neu verglichen —, sonst eine Zahl,
+/// bei der der größte Wert zuerst steht.
 ///
 /// "Stärke" (Marginal-Contribution-Analyse aus `tools/simulator/bin/
 /// kartenstaerke.dart`) fehlt hier bewusst — dieser Wert wird bisher nur in
 /// der Simulation berechnet, nicht als Kartenfeld in der App ausgeliefert,
 /// bräuchte also eine eigene Daten-Pipeline statt nur eine Sortierfunktion.
+/// Seltenheit dagegen steht schon auf jeder Karte (auch schon farblich am
+/// Rahmen zu erkennen, [seltenheitsFarbe]) und kostet hier nur eine Zeile.
 enum _Sortierung {
-  kategorie('Kategorie', null),
-  v1('Nach V1', 0),
-  v2('Nach V2', 1),
-  s1('Nach S1', 2),
-  s2('Nach S2', 3),
-  hg1('Nach HG1', 4),
-  hg2('Nach HG2', 5);
+  kategorie('Kategorie'),
+  seltenheit('Nach Seltenheit'),
+  v1('Nach V1'),
+  v2('Nach V2'),
+  s1('Nach S1'),
+  s2('Nach S2'),
+  hg1('Nach HG1'),
+  hg2('Nach HG2');
 
   final String label;
-  final int? slotIndex;
-  const _Sortierung(this.label, this.slotIndex);
+  const _Sortierung(this.label);
+
+  int? wertFuer(Karte karte) => switch (this) {
+    _Sortierung.kategorie => null,
+    _Sortierung.seltenheit => _seltenheitSortWert(karte.seltenheit),
+    _Sortierung.v1 => _slotSortWert(karte.slots[0]),
+    _Sortierung.v2 => _slotSortWert(karte.slots[1]),
+    _Sortierung.s1 => _slotSortWert(karte.slots[2]),
+    _Sortierung.s2 => _slotSortWert(karte.slots[3]),
+    _Sortierung.hg1 => _slotSortWert(karte.slots[4]),
+    _Sortierung.hg2 => _slotSortWert(karte.slots[5]),
+  };
 }
 
 /// Einheitliche Vergleichsgröße für ein Slot-Symbol: ein Loch gilt als das
@@ -456,6 +469,14 @@ int _slotSortWert(SlotSymbol symbol) => switch (symbol) {
   Loch() => 3,
   Farbig(wert: final w) => w,
   Schwarz() => -1,
+};
+
+/// Dieselbe Rangfolge wie [seltenheitsFarbe]: Gold > Violett > Blau > Grau.
+int _seltenheitSortWert(String seltenheit) => switch (seltenheit) {
+  'einzigartig' => 3,
+  'episch' => 2,
+  'selten' => 1,
+  _ => 0, // haeufig
 };
 
 /// Kompaktes Sortiermenü — ein einzelnes Icon statt einer Zeile voller
