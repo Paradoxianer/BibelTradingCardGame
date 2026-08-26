@@ -134,11 +134,14 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
     final inhalt = KartenWidget.handkarte(karte, breite: null, ansicht: KartenAnsicht.voll);
     final mitZaehler = Opacity(
       opacity: kann ? 1.0 : 0.45,
+      // Innerhalb der Kartenränder (nicht mehr darüber hinausragend): bei
+      // eng gepackten Karten ist links/rechts kein Platz mehr für einen
+      // Zähler, der über den Rand hinaussteht — er würde vom Nachbarn oder
+      // vom Seiten-Ausschnitt abgeschnitten.
       child: Stack(
-        clipBehavior: Clip.none,
         children: [
           inhalt,
-          Positioned(top: -8, right: -8, child: _Zaehler(anzahl: anzahl, max: karte.anzahlImDeckMax)),
+          Positioned(top: 4, right: 4, child: _Zaehler(anzahl: anzahl, max: karte.anzahlImDeckMax)),
         ],
       ),
     );
@@ -151,13 +154,16 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
     );
   }
 
-  /// Bewusst konstant: der PageController in [_KartenCoverflow] wird nicht
-  /// neu aufgebaut, wenn sich die Fläche ändert (z. B. beim Skalieren des
-  /// Browserfensters). Eine aus der Fläche abgeleitete Fraction lief dadurch
-  /// mit dem Fenster auseinander. Wie groß die Karte selbst innerhalb ihres
-  /// Ausschnitts wird, rechnet [KartenWidget] jetzt allein aus (`breite:
-  /// null`) — hier geht es nur noch darum, wie viel Nachbarn hereinragen.
-  static const double _kViewportFraction = 0.42;
+  /// Klein genug, dass mehrere Karten gleichzeitig sichtbar sind — wie
+  /// Karten, die nebeneinander auf einem Tisch liegen, nicht wie eine
+  /// Diashow mit einer einzigen Hauptkarte. Bewusst konstant: der
+  /// PageController in [_KartenCoverflow] wird nicht neu aufgebaut, wenn
+  /// sich die Fläche ändert (z. B. beim Skalieren des Browserfensters). Eine
+  /// aus der Fläche abgeleitete Fraction lief dadurch mit dem Fenster
+  /// auseinander. Wie groß die Karte selbst innerhalb ihres Ausschnitts
+  /// wird, rechnet [KartenWidget] jetzt allein aus (`breite: null`) — hier
+  /// geht es nur noch darum, wie viele Karten nebeneinander passen.
+  static const double _kViewportFraction = 0.26;
 
   @override
   Widget build(BuildContext context) {
@@ -393,10 +399,13 @@ class _KartenCoverflowState extends State<_KartenCoverflow> {
             ? (_controller.page ?? index.toDouble())
             : index.toDouble();
         final abstand = (aktuelleSeite - index).abs().clamp(0.0, 1.0);
+        // Nur ein leichter Hinweis, welche Karte gerade "aktiv" ist — die
+        // Karten sollen wie nebeneinander ausgelegt wirken, nicht wie eine
+        // Diashow mit einer stark hervorgehobenen Hauptkarte.
         return Center(
           child: Opacity(
-            opacity: 1 - abstand * 0.55,
-            child: Transform.scale(scale: 1 - abstand * 0.35, child: kind),
+            opacity: 1 - abstand * 0.25,
+            child: Transform.scale(scale: 1 - abstand * 0.08, child: kind),
           ),
         );
       },
