@@ -267,6 +267,113 @@ void main() {
     expect(find.byWidgetPredicate((w) => w is KartenWidget && w.karte?.id == 'aaa_schwach'), findsNothing);
   });
 
+  testWidgets(
+    'Deck-Kategorie-Filter zeigt nur Karten der gewählten Kategorie, unabhängig vom Pool-Filter',
+    (tester) async {
+      final kartenset = Kartenset(
+        set: 'TEST',
+        version: '1.0.0',
+        tabs: {
+          'R_Test': [
+            _karte('g0', kategorie: Kategorie.gebet),
+            _karte('gl0', kategorie: Kategorie.glauben),
+          ],
+        },
+      );
+      await DeckRepository.speichere([kartenset.alleKarten[0], kartenset.alleKarten[1]]);
+      await pumpScreen(tester, kartenset);
+
+      expect(find.text('2/35 Karten · 0/7 Evil'), findsOneWidget);
+
+      final deckFilterChip = find.descendant(
+        of: find.byKey(const ValueKey('deck-filterrow')),
+        matching: find.widgetWithText(ChoiceChip, 'Glauben'),
+      );
+      expect(deckFilterChip, findsOneWidget);
+      await tester.tap(deckFilterChip);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('deck-dragtarget')),
+          matching: find.byWidgetPredicate((w) => w is KartenWidget && w.karte?.id == 'gl0'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('deck-dragtarget')),
+          matching: find.byWidgetPredicate((w) => w is KartenWidget && w.karte?.id == 'g0'),
+        ),
+        findsNothing,
+        reason: 'g0 ist gebet, nicht glauben — nach dem Deck-Filter ausgeblendet',
+      );
+
+      // Der Pool-Filter bleibt unberührt: 'Alle' ist dort weiterhin gewählt.
+      final poolAlleChip = tester.widget<ChoiceChip>(
+        find.descendant(
+          of: find.byKey(const ValueKey('pool-filterrow')),
+          matching: find.widgetWithText(ChoiceChip, 'Alle'),
+        ),
+      );
+      expect(poolAlleChip.selected, isTrue);
+    },
+  );
+
+  testWidgets('Deck-Sortiermenü sortiert das Deck unabhängig vom Pool-Sortiermenü', (tester) async {
+    final kartenset = Kartenset(
+      set: 'TEST',
+      version: '1.0.0',
+      tabs: {
+        'R_Test': [
+          _karteMitV1('aaa_schwach', '-1'),
+          _karteMitV1('bbb_null', '0'),
+          _karteMitV1('ccc_stark', '2'),
+          _karteMitV1('ddd_loch', 'x'),
+        ],
+      },
+    );
+    await DeckRepository.speichere(kartenset.alleKarten);
+    await pumpScreen(tester, kartenset);
+
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('deck-dragtarget')),
+        matching: find.byWidgetPredicate((w) => w is KartenWidget && w.karte?.id == 'aaa_schwach'),
+      ),
+      findsOneWidget,
+      reason: 'Standardsortierung ist Kategorie/Name',
+    );
+
+    final deckSortIcon = find.descendant(
+      of: find.byKey(const ValueKey('deck-filterrow')),
+      matching: find.byIcon(Icons.sort),
+    );
+    await tester.tap(deckSortIcon);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Nach V1'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('deck-dragtarget')),
+        matching: find.byWidgetPredicate((w) => w is KartenWidget && w.karte?.id == 'ddd_loch'),
+      ),
+      findsOneWidget,
+      reason: 'Ein Loch an V1 gilt als bestes Symbol und steht nach der Sortierung zentriert',
+    );
+
+    // Der Pool bleibt bei seiner eigenen (Standard-)Sortierung.
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('pool-dragtarget')),
+        matching: find.byWidgetPredicate((w) => w is KartenWidget && w.karte?.id == 'aaa_schwach'),
+      ),
+      findsOneWidget,
+      reason: 'Pool-Sortierung ist unverändert Kategorie/Name geblieben',
+    );
+  });
+
   testWidgets('Sortiermenü ordnet den Pool nach Seltenheit', (tester) async {
     final kartenset = Kartenset(
       set: 'TEST',

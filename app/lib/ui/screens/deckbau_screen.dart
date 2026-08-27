@@ -43,27 +43,39 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
   int _deckSeite = 0;
   int _poolSeite = 0;
 
+  // Eigene Filter/Sortierung fürs Deck, unabhängig vom Pool — man will z. B.
+  // den Pool nach "Tun" filtern, um etwas zu suchen, während man das Deck
+  // gerade nach Seltenheit durchsieht.
+  Kategorie? _deckFilter;
+  _Sortierung _deckSortierung = _Sortierung.kategorie;
+
   @override
   void initState() {
     super.initState();
     _deck = List.of(DeckRepository.lade(widget.kartenset.alleKarten));
-    _auswaehlbar = widget.kartenset.alleKarten.where((k) => k.kategorie != Kategorie.start).toList()
-      ..sort((a, b) {
-        final kat = a.kategorie.index.compareTo(b.kategorie.index);
-        return kat != 0 ? kat : a.name.compareTo(b.name);
-      });
+    _auswaehlbar = widget.kartenset.alleKarten.where((k) => k.kategorie != Kategorie.start).toList();
   }
 
-  List<Karte> get _gefiltert {
-    final basis = _filter == null ? _auswaehlbar : _auswaehlbar.where((k) => k.kategorie == _filter).toList();
-    if (_sortierung == _Sortierung.kategorie) return basis; // schon Kategorie+Name sortiert
+  /// Filtert [karten] nach [filter] (Kategorie, `null` = alle) und sortiert
+  /// nach [sortierung] — `_Sortierung.kategorie` fällt dabei auf
+  /// Kategorie-dann-Name zurück, für Pool wie Deck gleichermaßen nutzbar.
+  List<Karte> _sortiereUndFiltere(List<Karte> karten, Kategorie? filter, _Sortierung sortierung) {
+    final basis = filter == null ? karten : karten.where((k) => k.kategorie == filter).toList();
     return List<Karte>.of(basis)..sort((a, b) {
-      final wa = _sortierung.wertFuer(a)!;
-      final wb = _sortierung.wertFuer(b)!;
+      final wa = sortierung.wertFuer(a);
+      final wb = sortierung.wertFuer(b);
+      if (wa == null || wb == null) {
+        final kat = a.kategorie.index.compareTo(b.kategorie.index);
+        return kat != 0 ? kat : a.name.compareTo(b.name);
+      }
       // Absteigend: der beste Wert beim gewählten Kriterium zuerst.
       return wa != wb ? wb.compareTo(wa) : a.name.compareTo(b.name);
     });
   }
+
+  List<Karte> get _poolGefiltert => _sortiereUndFiltere(_auswaehlbar, _filter, _sortierung);
+
+  List<Karte> get _deckGefiltert => _sortiereUndFiltere(_deck, _deckFilter, _deckSortierung);
 
   int _anzahlImDeck(Karte karte) => _deck.where((k) => k.id == karte.id).length;
 
@@ -73,8 +85,6 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
     if (!_kannHinzufuegen(karte)) return;
     setState(() => _deck.add(karte));
   }
-
-  void _entfernenNachIndex(int index) => setState(() => _deck.removeAt(index));
 
   void _entfernenErsteVorkommen(Karte karte) => setState(() {
     final index = _deck.indexWhere((k) => k.id == karte.id);
@@ -89,6 +99,16 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
   void _sortierungSetzen(_Sortierung sortierung) => setState(() {
     _sortierung = sortierung;
     _poolSeite = 0;
+  });
+
+  void _deckFilterSetzen(Kategorie? kategorie) => setState(() {
+    _deckFilter = kategorie;
+    _deckSeite = 0;
+  });
+
+  void _deckSortierungSetzen(_Sortierung sortierung) => setState(() {
+    _deckSortierung = sortierung;
+    _deckSeite = 0;
   });
 
   void _zufaelligFuellen() {
@@ -169,8 +189,9 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
   Widget build(BuildContext context) {
     final fehler = pruefeDeck(_deck);
     final evilAnzahl = _deck.where((k) => k.kategorie == Kategorie.evil).length;
-    final gefiltert = _gefiltert;
-    final deckSeite = _deck.isEmpty ? 0 : _deckSeite.clamp(0, _deck.length - 1);
+    final deckGefiltert = _deckGefiltert;
+    final gefiltert = _poolGefiltert;
+    final deckSeite = deckGefiltert.isEmpty ? 0 : _deckSeite.clamp(0, deckGefiltert.length - 1);
     final poolSeite = gefiltert.isEmpty ? 0 : _poolSeite.clamp(0, gefiltert.length - 1);
 
     return Scaffold(
@@ -179,6 +200,20 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
         children: [
           _StatusLeiste(gesamt: _deck.length, evil: evilAnzahl, fehler: fehler),
           const _Ueberschrift('Dein Deck — Karte aus dem Pool hierher ziehen'),
+          if (_deck.isNotEmpty)
+            KeyedSubtree(
+              key: const ValueKey('deck-filterrow'),
+              child: Row(
+                children: [
+                  Expanded(child: _KategorieFilter(aktuell: _deckFilter, onGewaehlt: _deckFilterSetzen)),
+                  _SortierMenu(
+                    key: const ValueKey('deck-sortmenu'),
+                    aktuell: _deckSortierung,
+                    onGewaehlt: _deckSortierungSetzen,
+                  ),
+                ],
+              ),
+            ),
           Expanded(
             child: DragTarget<_Zug>(
               key: const ValueKey('deck-dragtarget'),
@@ -188,8 +223,11 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
                 hervorgehoben: kandidaten.isNotEmpty,
                 child: _deck.isEmpty
                     ? const Center(child: Text('Noch keine Karten im Deck.'))
+                    : deckGefiltert.isEmpty
+                    ? const Center(child: Text('Keine Karten in dieser Kategorie.'))
                     : _KartenCoverflow(
-                        karten: _deck,
+                        key: ValueKey(_deckFilter),
+                        karten: deckGefiltert,
                         viewportFraction: _kViewportFraction,
                         kartenBauen: _deckKarteBauen,
                         onSeiteGeaendert: (i) => setState(() => _deckSeite = i),
@@ -197,22 +235,29 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
               ),
             ),
           ),
-          if (_deck.isNotEmpty)
+          if (deckGefiltert.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: OutlinedButton.icon(
-                onPressed: () => _entfernenNachIndex(deckSeite),
+                onPressed: () => _entfernenErsteVorkommen(deckGefiltert[deckSeite]),
                 icon: const Icon(Icons.remove_circle_outline),
                 label: const Text('Aus dem Deck entfernen'),
               ),
             ),
           const Divider(height: 16),
           const _Ueberschrift('Kartenpool — antippen und ins Deck ziehen'),
-          Row(
-            children: [
-              Expanded(child: _KategorieFilter(aktuell: _filter, onGewaehlt: _filterSetzen)),
-              _SortierMenu(aktuell: _sortierung, onGewaehlt: _sortierungSetzen),
-            ],
+          KeyedSubtree(
+            key: const ValueKey('pool-filterrow'),
+            child: Row(
+              children: [
+                Expanded(child: _KategorieFilter(aktuell: _filter, onGewaehlt: _filterSetzen)),
+                _SortierMenu(
+                  key: const ValueKey('pool-sortmenu'),
+                  aktuell: _sortierung,
+                  onGewaehlt: _sortierungSetzen,
+                ),
+              ],
+            ),
           ),
           Expanded(
             child: DragTarget<_Zug>(
@@ -495,7 +540,7 @@ class _SortierMenu extends StatelessWidget {
   final _Sortierung aktuell;
   final ValueChanged<_Sortierung> onGewaehlt;
 
-  const _SortierMenu({required this.aktuell, required this.onGewaehlt});
+  const _SortierMenu({super.key, required this.aktuell, required this.onGewaehlt});
 
   @override
   Widget build(BuildContext context) => PopupMenuButton<_Sortierung>(
