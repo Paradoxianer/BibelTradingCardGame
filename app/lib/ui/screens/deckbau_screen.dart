@@ -35,9 +35,15 @@ class _Zug {
   const _Zug(this.karte, {required this.ausDeck});
 }
 
+/// Sentinel-Wert für den "Neues Deck…"-Eintrag im Deck-Wechsel-Menü — kann
+/// keine echte Deck-ID sein ([DeckRepository] erzeugt IDs aus Zeitstempeln.
+const String _neuesDeckSentinel = '__neu__';
+
 class _DeckbauScreenState extends State<DeckbauScreen> {
   late List<Karte> _deck;
   late final List<Karte> _auswaehlbar;
+  late List<DeckEintrag> _alleDecks;
+  late String _aktiveDeckId;
   Kategorie? _filter;
   _Sortierung _sortierung = _Sortierung.kategorie;
   int _deckSeite = 0;
@@ -49,11 +55,123 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
   Kategorie? _deckFilter;
   _Sortierung _deckSortierung = _Sortierung.kategorie;
 
+  DeckEintrag get _aktuellerEintrag =>
+      _alleDecks.firstWhere((d) => d.id == _aktiveDeckId, orElse: () => _alleDecks.first);
+
   @override
   void initState() {
     super.initState();
-    _deck = List.of(DeckRepository.lade(widget.kartenset.alleKarten));
     _auswaehlbar = widget.kartenset.alleKarten.where((k) => k.kategorie != Kategorie.start).toList();
+    _alleDecks = DeckRepository.alle();
+    _aktiveDeckId = DeckRepository.aktiveId() ?? _alleDecks.first.id;
+    _deck = List.of(DeckRepository.ladeKarten(_aktuellerEintrag, widget.kartenset.alleKarten));
+  }
+
+  void _deckAnsichtZuruecksetzen() {
+    _deckFilter = null;
+    _deckSortierung = _Sortierung.kategorie;
+    _deckSeite = 0;
+  }
+
+  /// Sichert unsauber gespeicherte Änderungen am aktuellen Deck, bevor die
+  /// Ansicht auf ein anderes Deck wechselt — sonst gingen Karten, die man
+  /// gerade gezogen aber noch nicht per "Speichern" bestätigt hat, beim
+  /// Wechsel stillschweigend verloren. Das Zieldeck wird danach frisch aus
+  /// dem Repository geladen statt aus `_alleDecks` — die zwischengespeicherte
+  /// Liste kann für genau dieses Deck veraltet sein, wenn es seit dem letzten
+  /// Auffrischen (z. B. beim Anlegen) bearbeitet, aber noch nie wieder
+  /// verlassen wurde.
+  Future<void> _wechseln(String neueId) async {
+    await DeckRepository.speichereKarten(_aktiveDeckId, _deck);
+    await DeckRepository.setzeAktiv(neueId);
+    final alleDecks = DeckRepository.alle();
+    final ziel = alleDecks.firstWhere((d) => d.id == neueId, orElse: () => alleDecks.first);
+    if (!mounted) return;
+    setState(() {
+      _alleDecks = alleDecks;
+      _aktiveDeckId = ziel.id;
+      _deck = List.of(DeckRepository.ladeKarten(ziel, widget.kartenset.alleKarten));
+      _deckAnsichtZuruecksetzen();
+    });
+  }
+
+  Future<void> _deckWechseln(String id) async {
+    if (id == _aktiveDeckId) return;
+    await _wechseln(id);
+  }
+
+  Future<String?> _namensDialog({required String titel, required String startwert, required String knopf}) {
+    final controller = TextEditingController(text: startwert);
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(titel),
+        content: TextField(controller: controller, autofocus: true),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: Text(knopf),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _neuesDeckAnlegen() async {
+    final name = await _namensDialog(
+      titel: 'Neues Deck',
+      startwert: 'Deck ${_alleDecks.length + 1}',
+      knopf: 'Anlegen',
+    );
+    if (name == null || name.isEmpty) return;
+    await DeckRepository.speichereKarten(_aktiveDeckId, _deck);
+    final id = await DeckRepository.anlegen(name);
+    if (!mounted) return;
+    setState(() {
+      _alleDecks = DeckRepository.alle();
+      _aktiveDeckId = id;
+      _deck = [];
+      _deckAnsichtZuruecksetzen();
+    });
+  }
+
+  Future<void> _deckUmbenennen() async {
+    final neuerName = await _namensDialog(
+      titel: 'Deck umbenennen',
+      startwert: _aktuellerEintrag.name,
+      knopf: 'Umbenennen',
+    );
+    if (neuerName == null || neuerName.isEmpty) return;
+    await DeckRepository.umbenennen(_aktiveDeckId, neuerName);
+    if (!mounted) return;
+    setState(() => _alleDecks = DeckRepository.alle());
+  }
+
+  Future<void> _deckLoeschen() async {
+    final bestaetigt = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Deck löschen?'),
+        content: Text('„${_aktuellerEintrag.name}" wird endgültig gelöscht.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Abbrechen')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Löschen')),
+        ],
+      ),
+    );
+    if (bestaetigt != true) return;
+    await DeckRepository.loeschen(_aktiveDeckId);
+    final alleDecks = DeckRepository.alle();
+    final aktiveId = DeckRepository.aktiveId() ?? alleDecks.first.id;
+    final aktivesEintrag = alleDecks.firstWhere((d) => d.id == aktiveId, orElse: () => alleDecks.first);
+    if (!mounted) return;
+    setState(() {
+      _alleDecks = alleDecks;
+      _aktiveDeckId = aktivesEintrag.id;
+      _deck = List.of(DeckRepository.ladeKarten(aktivesEintrag, widget.kartenset.alleKarten));
+      _deckAnsichtZuruecksetzen();
+    });
   }
 
   /// Filtert [karten] nach [filter] (Kategorie, `null` = alle) und sortiert
@@ -124,7 +242,7 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
   void _leeren() => setState(() => _deck.clear());
 
   Future<void> _speichern() async {
-    await DeckRepository.speichere(_deck);
+    await DeckRepository.speichereKarten(_aktiveDeckId, _deck);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Deck gespeichert.')));
   }
@@ -195,7 +313,38 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
     final poolSeite = gefiltert.isEmpty ? 0 : _poolSeite.clamp(0, gefiltert.length - 1);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Eigenes Deck')),
+      appBar: AppBar(
+        title: Text(_aktuellerEintrag.name),
+        actions: [
+          IconButton(
+            onPressed: _deckUmbenennen,
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Deck umbenennen',
+          ),
+          IconButton(
+            onPressed: _alleDecks.length > 1 ? _deckLoeschen : null,
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'Deck löschen',
+          ),
+          PopupMenuButton<String>(
+            key: const ValueKey('deck-wechsel-menu'),
+            tooltip: 'Deck wechseln',
+            icon: const Icon(Icons.folder_open_outlined),
+            onSelected: (id) => id == _neuesDeckSentinel ? _neuesDeckAnlegen() : _deckWechseln(id),
+            itemBuilder: (context) => [
+              for (final d in _alleDecks)
+                CheckedPopupMenuItem(value: d.id, checked: d.id == _aktiveDeckId, child: Text(d.name)),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: _neuesDeckSentinel,
+                child: Row(
+                  children: [Icon(Icons.add), SizedBox(width: 8), Text('Neues Deck…')],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
       body: Column(
         children: [
           _StatusLeiste(gesamt: _deck.length, evil: evilAnzahl, fehler: fehler),
