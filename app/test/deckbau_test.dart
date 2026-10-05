@@ -78,6 +78,16 @@ Finder _entfernenKnopf() => find.ancestor(
 final _deckZiel = find.byKey(const ValueKey('deck-dragtarget'));
 final _poolZiel = find.byKey(const ValueKey('pool-dragtarget'));
 
+/// Die IDs der aktuell im Deck-Karussell gebauten Karten, in Baureihenfolge
+/// (== Anzeige-/Listenreihenfolge, da `PageView.builder` seine Items der
+/// Reihe nach erzeugt).
+List<String?> _deckKartenReihenfolge(WidgetTester tester) => tester
+    .widgetList<KartenWidget>(
+      find.descendant(of: find.byKey(const ValueKey('deck-dragtarget')), matching: find.byType(KartenWidget)),
+    )
+    .map((w) => w.karte?.id)
+    .toList();
+
 /// Legt vor dem Pumpen ein neues, aktives Deck mit [karten] an — [anlegen]
 /// setzt es automatisch als aktiv, `DeckbauScreen` lädt beim Start also
 /// genau dieses Deck.
@@ -380,6 +390,82 @@ void main() {
       findsOneWidget,
       reason: 'Pool-Sortierung ist unverändert Kategorie/Name geblieben',
     );
+  });
+
+  testWidgets(
+    '"Eigene Reihenfolge": eine aus dem Pool gezogene Karte landet genau vor der Karte, auf die man sie fallen lässt',
+    (tester) async {
+      final kartenset = Kartenset(
+        set: 'TEST',
+        version: '1.0.0',
+        tabs: {
+          'R_Test': [_karte('card_a'), _karte('card_b'), _karte('card_c')],
+        },
+      );
+      await _seedeAktivesDeck([kartenset.alleKarten[0], kartenset.alleKarten[2]]); // card_a, card_c
+      await pumpScreen(tester, kartenset);
+
+      final deckSortIcon = find.descendant(
+        of: find.byKey(const ValueKey('deck-filterrow')),
+        matching: find.byIcon(Icons.sort),
+      );
+      await tester.tap(deckSortIcon);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Eigene Reihenfolge'), warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      expect(_deckKartenReihenfolge(tester), ['card_a', 'card_c']);
+
+      // card_b kommt aus dem Pool und wird auf card_c fallen gelassen — sie
+      // muss genau davor landen, nicht ans Ende oder nach Name sortiert.
+      final cardBImPool = find.byWidgetPredicate(
+        (w) => w is Draggable<Object?> && (w.data as dynamic)?.karte?.id == 'card_b',
+      );
+      final cardCImDeck = find.descendant(
+        of: find.byKey(const ValueKey('deck-dragtarget')),
+        matching: find.byWidgetPredicate((w) => w is KartenWidget && w.karte?.id == 'card_c'),
+      );
+      await ziehen(tester, cardBImPool, cardCImDeck);
+
+      expect(_deckKartenReihenfolge(tester), ['card_a', 'card_b', 'card_c']);
+    },
+  );
+
+  testWidgets('"Eigene Reihenfolge": eine Deck-Karte lässt sich per Ziehen neu einsortieren', (tester) async {
+    final kartenset = Kartenset(
+      set: 'TEST',
+      version: '1.0.0',
+      tabs: {
+        'R_Test': [_karte('card_a'), _karte('card_b'), _karte('card_c')],
+      },
+    );
+    await _seedeAktivesDeck(kartenset.alleKarten); // card_a, card_b, card_c
+    await pumpScreen(tester, kartenset);
+
+    final deckSortIcon = find.descendant(
+      of: find.byKey(const ValueKey('deck-filterrow')),
+      matching: find.byIcon(Icons.sort),
+    );
+    await tester.tap(deckSortIcon);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Eigene Reihenfolge'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    expect(_deckKartenReihenfolge(tester), ['card_a', 'card_b', 'card_c']);
+
+    // card_b (mittig, also sichtbar) wird vor card_a fallen gelassen. card_c
+    // liegt außerhalb des sichtbaren Ausschnitts (900px breit) und ist hier
+    // nicht zuverlässig greifbar.
+    final cardBImDeck = find.byWidgetPredicate(
+      (w) => w is Draggable<Object?> && (w.data as dynamic)?.karte?.id == 'card_b' && (w.data as dynamic)?.ausDeck == true,
+    );
+    final cardAImDeck = find.descendant(
+      of: find.byKey(const ValueKey('deck-dragtarget')),
+      matching: find.byWidgetPredicate((w) => w is KartenWidget && w.karte?.id == 'card_a'),
+    );
+    await ziehen(tester, cardBImDeck, cardAImDeck);
+
+    expect(_deckKartenReihenfolge(tester), ['card_b', 'card_a', 'card_c']);
   });
 
   testWidgets('Sortiermenü ordnet den Pool nach Seltenheit', (tester) async {

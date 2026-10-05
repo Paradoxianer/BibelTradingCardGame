@@ -177,8 +177,12 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
   /// Filtert [karten] nach [filter] (Kategorie, `null` = alle) und sortiert
   /// nach [sortierung] — `_Sortierung.kategorie` fällt dabei auf
   /// Kategorie-dann-Name zurück, für Pool wie Deck gleichermaßen nutzbar.
+  /// `_Sortierung.eigen` sortiert überhaupt nicht: die Reihenfolge von
+  /// [karten] (im Deck per Drag&Drop gesetzt, siehe [_deckKarteBauen]) bleibt
+  /// unangetastet.
   List<Karte> _sortiereUndFiltere(List<Karte> karten, Kategorie? filter, _Sortierung sortierung) {
     final basis = filter == null ? karten : karten.where((k) => k.kategorie == filter).toList();
+    if (sortierung == _Sortierung.eigen) return basis;
     return List<Karte>.of(basis)..sort((a, b) {
       final wa = sortierung.wertFuer(a);
       final wb = sortierung.wertFuer(b);
@@ -208,6 +212,30 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
     final index = _deck.indexWhere((k) => k.id == karte.id);
     if (index != -1) _deck.removeAt(index);
   });
+
+  /// Fügt [bewegteKarte] genau vor [vorKarte] im Deck ein — für
+  /// `_Sortierung.eigen`, wo (anders als bei jeder Wert-Sortierung) die
+  /// Drop-Position tatsächlich zählt: jede Karte im Deck ist dort selbst ein
+  /// Drop-Ziel (siehe [_deckKarteBauen]), nicht nur die Fläche insgesamt.
+  /// [ausDeck] unterscheidet, ob [bewegteKarte] aus dem Pool kommt (einfügen)
+  /// oder schon im Deck steckt (umsortieren: erst am alten Platz entfernen).
+  /// Objektidentität statt `id`-Vergleich, damit bei mehreren Kopien
+  /// derselben Karte im Deck genau die gezogene Instanz gefunden wird, nicht
+  /// irgendeine mit gleicher ID.
+  void _einfuegenVorKarte(Karte bewegteKarte, {required bool ausDeck, required Karte vorKarte}) {
+    if (identical(bewegteKarte, vorKarte)) return;
+    setState(() {
+      if (ausDeck) {
+        final altIndex = _deck.indexWhere((k) => identical(k, bewegteKarte));
+        if (altIndex == -1) return;
+        _deck.removeAt(altIndex);
+      } else if (!_kannHinzufuegen(bewegteKarte)) {
+        return;
+      }
+      final zielIndex = _deck.indexWhere((k) => identical(k, vorKarte));
+      _deck.insert(zielIndex == -1 ? _deck.length : zielIndex, bewegteKarte);
+    });
+  }
 
   void _filterSetzen(Kategorie? kategorie) => setState(() {
     _filter = kategorie;
@@ -258,11 +286,30 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
     // und gibt die Geste damit sauber an die PageView-Wischgeste weiter. Ein
     // normaler Draggable (auch mit `axis`) löst sich dagegen nie aktiv, "gewinnt"
     // dadurch trotzdem gegen das Karussell und blockiert jedes Blättern.
-    return LongPressDraggable<_Zug>(
+    final ziehbar = LongPressDraggable<_Zug>(
       data: _Zug(karte, ausDeck: true),
       feedback: Material(color: Colors.transparent, child: inhalt),
       childWhenDragging: Opacity(opacity: 0.3, child: inhalt),
       child: inhalt,
+    );
+    if (_deckSortierung != _Sortierung.eigen) return ziehbar;
+
+    // Eigene Reihenfolge: anders als bei jeder Wert-Sortierung entscheidet
+    // hier tatsächlich, wo man loslässt — jede Karte ist deshalb selbst ein
+    // Drop-Ziel (die gezogene landet direkt davor), nicht nur die Fläche
+    // insgesamt (die bleibt als Auffangziel für's Deckende erhalten).
+    return DragTarget<_Zug>(
+      onWillAcceptWithDetails: (d) => d.data.ausDeck || _kannHinzufuegen(d.data.karte),
+      onAcceptWithDetails: (d) => _einfuegenVorKarte(d.data.karte, ausDeck: d.data.ausDeck, vorKarte: karte),
+      builder: (context, kandidaten, _) => Container(
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: kandidaten.isNotEmpty ? Colors.amber : Colors.transparent,
+            width: 3,
+          ),
+        ),
+        child: ziehbar,
+      ),
     );
   }
 
@@ -366,7 +413,14 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
           Expanded(
             child: DragTarget<_Zug>(
               key: const ValueKey('deck-dragtarget'),
-              onWillAcceptWithDetails: (d) => !d.data.ausDeck && _kannHinzufuegen(d.data.karte),
+              // In "Eigene Reihenfolge" übernehmen die Drop-Ziele der
+              // einzelnen Karten das Einfügen (siehe _deckKarteBauen) — bei
+              // leerem Deck gibt es aber noch keine Karte, auf die man
+              // zielen könnte, deshalb hier als Ausnahme weiterhin erlaubt.
+              onWillAcceptWithDetails: (d) =>
+                  !d.data.ausDeck &&
+                  (_deckSortierung != _Sortierung.eigen || _deck.isEmpty) &&
+                  _kannHinzufuegen(d.data.karte),
               onAcceptWithDetails: (d) => _hinzufuegen(d.data.karte),
               builder: (context, kandidaten, _) => _Rahmen(
                 hervorgehoben: kandidaten.isNotEmpty,
@@ -642,6 +696,7 @@ class _Zaehler extends StatelessWidget {
 /// Rahmen zu erkennen, [seltenheitsFarbe]) und kostet hier nur eine Zeile.
 enum _Sortierung {
   kategorie('Kategorie'),
+  eigen('Eigene Reihenfolge'),
   seltenheit('Nach Seltenheit'),
   v1('Nach V1'),
   v2('Nach V2'),
@@ -655,6 +710,7 @@ enum _Sortierung {
 
   int? wertFuer(Karte karte) => switch (this) {
     _Sortierung.kategorie => null,
+    _Sortierung.eigen => null,
     _Sortierung.seltenheit => _seltenheitSortWert(karte.seltenheit),
     _Sortierung.v1 => _slotSortWert(karte.slots[0]),
     _Sortierung.v2 => _slotSortWert(karte.slots[1]),
