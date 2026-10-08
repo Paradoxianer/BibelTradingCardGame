@@ -64,6 +64,9 @@ void main() {
     );
     expect(find.text('Denn ich weiß …'), findsOneWidget);
     expect(find.text('a'), findsWidgets); // Name und card_id
+    // Die Stelle steht schon in der Namensleiste — nicht noch einmal unter
+    // dem Bibeltext.
+    expect(find.text('Philipper 1,19'), findsOneWidget);
   });
 
   testWidgets('Rückseite verrät keinen Wert und spiegelt die Löcher', (
@@ -100,6 +103,46 @@ void main() {
         .where((d) => d.border != null)
         .toList();
     expect(rahmen, isNotEmpty);
+  });
+
+  testWidgets('breite: null passt sich der Fläche an, Seitenverhältnis bleibt fest', (
+    tester,
+  ) async {
+    // Groß genug, dass keiner der Testfälle unten an den Bildschirmrand statt
+    // an die eigens gesetzte SizedBox-Größe stößt.
+    tester.view.physicalSize = const Size(1200, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    Future<Size> groesseBei(double boxBreite, double boxHoehe) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Center(
+            child: SizedBox(
+              width: boxBreite,
+              height: boxHoehe,
+              child: KartenWidget.handkarte(karte, ansicht: KartenAnsicht.voll, breite: null),
+            ),
+          ),
+        ),
+      );
+      // Nicht an KartenWidget selbst messen: dessen interner LayoutBuilder
+      // (für breite: null) berichtet immer die volle eingehende Fläche als
+      // eigene Größe, nicht die kleinere, seitenverhältnistreue Karte
+      // darin. ClipPath sitzt direkt auf der tatsächlich berechneten
+      // SizedBox(breite, hoehe) und gibt deren Größe unverändert weiter.
+      return tester.getSize(find.byType(ClipPath));
+    }
+
+    // Box schmal und überreichlich hoch: Breite ist der Flaschenhals.
+    final schmaleBox = await groesseBei(100, 1000);
+    expect(schmaleBox.width, closeTo(100, 0.5));
+    expect(schmaleBox.height, closeTo(100 * 1.5, 0.5), reason: 'Verhältnis 1:1.5 aus KartenAnsicht.voll');
+
+    // Box breit, aber flach: Höhe ist der Flaschenhals.
+    final flacheBox = await groesseBei(1000, 150);
+    expect(flacheBox.height, closeTo(150, 0.5));
+    expect(flacheBox.width, closeTo(150 / 1.5, 0.5));
   });
 
   testWidgets('leeres Spielfeld ist kein Karton, sondern freier Platz', (

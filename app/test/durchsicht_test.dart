@@ -85,7 +85,8 @@ void main() {
   testWidgets('durch das Loch einer Handkarte sieht man das Spielbrett', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(1600, 1400);
+    // Unter 1200px bleibt es bei der kompakten Kartenansicht (spiel_screen.dart).
+    tester.view.physicalSize = const Size(1000, 1400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
@@ -153,11 +154,7 @@ void main() {
     final box = tester.renderObject<RenderBox>(karte);
     final ecke = box.localToGlobal(Offset.zero);
     final breite = box.size.width;
-    final layout = SlotLayout(
-      kartenBreite: breite,
-      zelle: breite / 8.2,
-      oben: breite / 40,
-    );
+    final layout = SlotLayout.fuerKarte(breite);
 
     final imLoch = farbeAn(ecke + layout.mitte(0));
     final nebenDerKarte = farbeAn(ecke + Offset(-8, breite / 2));

@@ -140,7 +140,7 @@ class _SlotPainter extends CustomPainter {
   /// tragen `-1` (zählt immer) und das Loch (macht das Zählen möglich).
   void _dreiecke(Canvas canvas, Offset mitte, double kontur) {
     final r = layout.symbolRadius;
-    final halbeBasis = layout.zelle * 0.145;
+    final halbeBasis = layout.zelle * 0.16;
     final spitze = r * 0.98;
     final basis = layout.zelle / 2;
 
@@ -150,13 +150,16 @@ class _SlotPainter extends CustomPainter {
         ..lineTo(mitte.dx + halbeBasis, mitte.dy + richtung * basis)
         ..lineTo(mitte.dx, mitte.dy + richtung * spitze)
         ..close();
+      // Dieselbe Konturstärke wie bei den Kreisen, mit spitzen statt runden
+      // Ecken: bei doppelter Stärke und runder Ecke wurde aus der Spitze ein
+      // Klecks, das Dreieck war kaum noch als solches zu erkennen.
       canvas.drawPath(
         pfad,
         Paint()
           ..color = Colors.white
           ..style = PaintingStyle.stroke
-          ..strokeWidth = kontur * 2
-          ..strokeJoin = StrokeJoin.round,
+          ..strokeWidth = kontur
+          ..strokeJoin = StrokeJoin.miter,
       );
       canvas.drawPath(pfad, Paint()..color = Colors.black);
     }

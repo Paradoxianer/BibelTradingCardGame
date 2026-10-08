@@ -25,9 +25,6 @@ Karte _karte(List<String> slots) => Karte(
   pictureLink: '',
 );
 
-SlotLayout _layoutFuer(double breite) =>
-    SlotLayout(kartenBreite: breite, zelle: breite / 8.2, oben: breite / 40);
-
 /// Rendert die Karte über knallrotem Grund und liest die Farben an den
 /// Slot-Mitten aus. Nur wo wirklich ausgestanzt ist, kommt Rot durch.
 Future<List<Color>> _farbenAnSlots(
@@ -63,7 +60,7 @@ Future<List<Color>> _farbenAnSlots(
   final ecke = tester
       .renderObject<RenderBox>(find.byType(KartenWidget))
       .localToGlobal(Offset.zero);
-  final layout = _layoutFuer(breite);
+  final layout = SlotLayout.fuerKarte(breite);
   final bytes = daten!.buffer.asUint8List();
 
   return [
@@ -108,16 +105,16 @@ void main() {
 
   group('SlotLayout', () {
     test('Ring bleibt auch auf kleinen Karten sichtbar dick', () {
-      final klein = _layoutFuer(120);
+      final klein = SlotLayout.fuerKarte(120);
       expect(klein.ringDicke, greaterThanOrEqualTo(1.5));
       expect(klein.lochRadius, greaterThan(0));
       // Auf großen Karten gilt wieder das Originalverhältnis.
-      final gross = _layoutFuer(320);
+      final gross = SlotLayout.fuerKarte(320);
       expect(gross.ringDicke / gross.symbolRadius, closeTo(1 - 121.5 / 143.5, 0.02));
     });
 
     test('sechs Zellen mittig und gleichmäßig', () {
-      final l = _layoutFuer(240);
+      final l = SlotLayout.fuerKarte(240);
       final mitten = [for (var i = 0; i < 6; i++) l.mitte(i)];
       for (var i = 1; i < 6; i++) {
         expect(mitten[i].dx - mitten[i - 1].dx, closeTo(l.zelle + SlotLayout.abstand, 0.001));
@@ -127,7 +124,7 @@ void main() {
   });
 
   test('Stanzung erzeugt je Loch eine eigene Kontur im Clip-Pfad', () {
-    final layout = _layoutFuer(120);
+    final layout = SlotLayout.fuerKarte(120);
     Path pfad(List<int> loecher) => LochStanzung(
       loecher: loecher,
       layout: layout,

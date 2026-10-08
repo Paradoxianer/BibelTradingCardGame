@@ -22,6 +22,22 @@ class SlotLayout {
     required this.oben,
   });
 
+  /// Die Geometrie für eine Karte gegebener Breite — **einzige** Quelle für
+  /// [KartenWidget] und für Tests, die reale Pixel nachmessen. Zwei separate
+  /// Berechnungen derselben Formel liefen schon zweimal auseinander (Ring zu
+  /// dünn, Dreiecke vom Kartenrand angeschnitten), weil eine Kopie geändert
+  /// wurde und die andere nicht.
+  factory SlotLayout.fuerKarte(double breite) {
+    final zelle = breite / 8.2;
+    return SlotLayout(
+      kartenBreite: breite,
+      zelle: zelle,
+      // Etwas mehr als die Rahmenbreite (breite/40): sitzt die Slot-Zeile
+      // direkt darauf, schneidet der Kartenrahmen die Dreieck-Spitzen an.
+      oben: breite / 40 + zelle * 0.12,
+    );
+  }
+
   /// Waagerechter Abstand zwischen zwei Zellen (je 1 px Polsterung).
   static const double abstand = 2;
 

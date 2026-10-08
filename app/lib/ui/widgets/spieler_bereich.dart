@@ -25,6 +25,18 @@ class SpielerBereich extends StatelessWidget {
   /// Baut eine offene Handkarte (nur im eigenen Bereich genutzt).
   final Widget Function(BuildContext, Karte)? handkarteBauen;
 
+  /// Ansicht der Felder bzw. der eigenen Hand: kompakt auf schmalen, voll
+  /// (mit Bibeltext, wie die bisherige Großansicht) auf breiten Bildschirmen
+  /// (spiel_screen.dart entscheidet anhand der Bildschirmbreite, Issue #8).
+  final KartenAnsicht ansicht;
+
+  /// Kartenbreite der Felder bzw. der eigenen Hand, passend zu [ansicht].
+  final double feldBreite;
+
+  /// Kartenbreite von Ziehstapel und fremder (verdeckter) Hand — bewusst
+  /// fest und klein, da diese Karten nie gelesen werden müssen.
+  final double kleinBreite;
+
   const SpielerBereich({
     super.key,
     required this.spieler,
@@ -33,14 +45,14 @@ class SpielerBereich extends StatelessWidget {
     required this.feldBauen,
     this.feldPunkte = const [],
     this.handkarteBauen,
+    this.ansicht = KartenAnsicht.kompakt,
+    this.feldBreite = 120,
+    this.kleinBreite = 74,
   });
-
-  static const double _feldBreite = 120;
-  static const double _kleinBreite = 74;
 
   @override
   Widget build(BuildContext context) {
-    final handBreite = eigen ? _feldBreite : _kleinBreite;
+    final handBreite = eigen ? feldBreite : kleinBreite;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       padding: const EdgeInsets.all(8),
@@ -86,7 +98,7 @@ class SpielerBereich extends StatelessWidget {
             ),
           ),
         const SizedBox(width: 12),
-        _Ziehstapel(deck: spieler.deck, breite: _kleinBreite),
+        _Ziehstapel(deck: spieler.deck, breite: kleinBreite),
       ],
     ),
     const SizedBox(height: 8),
@@ -94,6 +106,7 @@ class SpielerBereich extends StatelessWidget {
       spieler: spieler,
       eigen: eigen,
       breite: handBreite,
+      ansicht: eigen ? ansicht : KartenAnsicht.kompakt,
       handkarteBauen: handkarteBauen,
     ),
   ];
@@ -198,12 +211,14 @@ class _Hand extends StatelessWidget {
   final Spieler spieler;
   final bool eigen;
   final double breite;
+  final KartenAnsicht ansicht;
   final Widget Function(BuildContext, Karte)? handkarteBauen;
 
   const _Hand({
     required this.spieler,
     required this.eigen,
     required this.breite,
+    required this.ansicht,
     required this.handkarteBauen,
   });
 
@@ -221,7 +236,7 @@ class _Hand extends StatelessWidget {
     // Die Mindestbreite sorgt dafür, dass die Zeile den Platz ausfüllt und
     // ihre Karten dadurch mittig stehen.
     return SizedBox(
-      height: breite * 0.92 + 6,
+      height: KartenWidget.hoeheFuer(breite, ansicht) + 6,
       child: LayoutBuilder(
         builder: (context, grenzen) => SingleChildScrollView(
           scrollDirection: Axis.horizontal,

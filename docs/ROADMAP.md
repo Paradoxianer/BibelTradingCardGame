@@ -50,9 +50,14 @@ spielbar; alle Regelwerk-Tests grün.
 1. `tools/simulator/` (ARCHITEKTUR §4) + einfacher Greedy-Bot.
 2. Massensimulation; Metriken gegen Zielwerte (Baseline bereits gemessen,
    siehe REGELWERK §7):
-   - Partiedauer 15–25 Züge — Baseline 16 ✅
-   - Startspieler-Winrate 48–52 % — Baseline **56 % ⚠️**, D5-Zusatzoption
-     („Startspieler zieht nur 4 Karten") als Erstes gegentesten
+   - Partiedauer 15–25 Züge — Baseline 16 ✅ (Greedy-vs-Greedy-Vollsimulation
+     zeigt 31, siehe docs/SIMULATION_PHASE1B.md — vermutlich Bot-Artefakt)
+   - Startspieler-Winrate 48–52 % — **erledigt:** die naive Prototyp-Baseline
+     von 56 % war zu pessimistisch; die vollständige Bot-Simulation liegt bei
+     51–52,7 % (n=1000, mehrere Seeds), knapp im/am Zielkorridor.
+     D5-Zusatzoption gegengetestet: ändert die Winrate nicht messbar
+     (±0,5 Punkte, im Rauschen) → **nicht übernommen**, siehe
+     docs/SIMULATION_PHASE1B.md und REGELWERK §7.
    - keine Kategorie/Person > ~35 % des Gesamtpunktebeitrags
    - prüfen, ob `erneuerung` die Evil-Handverstopfung wirklich löst (D6)
    - `umordnung` gesondert bewerten (schwer abschätzbarer Effekt)

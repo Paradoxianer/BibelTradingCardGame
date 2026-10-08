@@ -27,6 +27,22 @@ Color seltenheitsFarbe(String seltenheit) => switch (seltenheit) {
   _ => const Color(0xFF7F8C8D), // Grau, häufig
 };
 
+/// Hintergrundfarbe der Namensleiste nach Kategorie — in [KartenAnsicht.kompakt]
+/// die einzige Kategorie-Kennzeichnung auf der Karte, in [KartenAnsicht.voll]
+/// dieselbe Färbung an derselben Stelle. Bewusst als eigene Funktion (nicht
+/// im Enum): eine neue Kategorie (z.B. „Gaben" — Wirken des Heiligen Geistes,
+/// noch nicht in [Kategorie] aufgenommen, das ist eine Regelwerk-Entscheidung)
+/// braucht dann nur eine weitere Zeile hier.
+Color kategorieFarbe(Kategorie kategorie) => switch (kategorie) {
+  Kategorie.gebet => const Color(0xFFE1D5F5), // Violett
+  Kategorie.glauben => const Color(0xFFFCE9B8), // Gold
+  Kategorie.tun => const Color(0xFFD3F0D6), // Grün
+  Kategorie.lehre => const Color(0xFFCFE3F7), // Blau
+  Kategorie.gottesdienst => const Color(0xFFFBDCC0), // Orange
+  Kategorie.evil => const Color(0xFFF3CFCF), // Rot, gedämpft
+  Kategorie.start => Colors.white,
+};
+
 const String _artworkKlein = 'assets/artwork/Placeholder_klein.jpg';
 
 /// Die **einzige** Kartendarstellung der App — für Handkarten, Spielfelder,
@@ -40,7 +56,14 @@ class KartenWidget extends StatelessWidget {
   final List<SlotAnzeige> slots;
 
   final KartenAnsicht ansicht;
-  final double breite;
+
+  /// `null` = die Karte füllt die verfügbare Fläche, so groß wie es das
+  /// feste Seitenverhältnis (aus [ansicht]) erlaubt, statt einer festen
+  /// Pixelbreite — die einzige Stelle, die das Seitenverhältnis kennt, damit
+  /// Aufrufer (z. B. ein CoverFlow-Karussell mit sich ändernder Fensterform)
+  /// nicht selbst nachrechnen müssen und dabei aus dem Ruder laufen können.
+  final double? breite;
+
   final bool rueckseite;
 
   const KartenWidget({
@@ -56,7 +79,7 @@ class KartenWidget extends StatelessWidget {
     Karte karte, {
     Key? key,
     KartenAnsicht ansicht = KartenAnsicht.kompakt,
-    double breite = 120,
+    double? breite = 120,
   }) => KartenWidget(
     key: key,
     karte: karte,
@@ -69,7 +92,7 @@ class KartenWidget extends StatelessWidget {
   factory KartenWidget.verdeckt(
     Karte karte, {
     Key? key,
-    double breite = 120,
+    double? breite = 120,
   }) => KartenWidget(
     key: key,
     karte: karte,
@@ -81,20 +104,32 @@ class KartenWidget extends StatelessWidget {
   static double hoeheFuer(double breite, KartenAnsicht ansicht) =>
       ansicht == KartenAnsicht.voll ? breite * 1.5 : breite * 0.92;
 
-  double get _hoehe => hoeheFuer(breite, ansicht);
-  double get _zelle => breite / 8.2;
-  double get _eckenRadius => breite / 14;
-
-  SlotLayout get _layout => SlotLayout(
-    kartenBreite: breite,
-    zelle: _zelle,
-    oben: breite / 40,
-  );
-
   @override
   Widget build(BuildContext context) {
+    if (breite != null) return _koerper(context, breite!);
+    return LayoutBuilder(
+      builder: (context, grenzen) => Center(child: _koerper(context, _breiteAus(grenzen))),
+    );
+  }
+
+  /// Größte Breite, bei der sowohl Breite als auch Höhe der Karte (festes
+  /// Verhältnis über [hoeheFuer]) noch in [grenzen] passen — genau das,
+  /// was [AspectRatio] intern tut, nur dass hier die Zahl selbst gebraucht
+  /// wird, weil Schriftgrößen etc. proportional zur Breite gerechnet werden.
+  double _breiteAus(BoxConstraints grenzen) {
+    final ausBreite = grenzen.hasBoundedWidth ? grenzen.maxWidth : double.infinity;
+    final ausHoeheVerfuegbar = grenzen.hasBoundedHeight ? grenzen.maxHeight : double.infinity;
+    final ausHoehe = ausHoeheVerfuegbar / (ansicht == KartenAnsicht.voll ? 1.5 : 0.92);
+    final b = ausBreite < ausHoehe ? ausBreite : ausHoehe;
+    return b.isFinite ? b : 120; // Fallback, falls nichts begrenzt ist
+  }
+
+  Widget _koerper(BuildContext context, double breite) {
+    final hoehe = hoeheFuer(breite, ansicht);
+    final eckenRadius = breite / 14;
+    final layout = SlotLayout.fuerKarte(breite);
     final k = karte;
-    if (k == null) return _LeeresFeld(breite: breite, hoehe: _hoehe);
+    if (k == null) return _LeeresFeld(breite: breite, hoehe: hoehe);
 
     final loecher = [
       for (var i = 0; i < slots.length; i++)
@@ -103,14 +138,14 @@ class KartenWidget extends StatelessWidget {
 
     return SizedBox(
       width: breite,
-      height: _hoehe,
+      height: hoehe,
       // Erst ausstanzen, dann zeichnen: an den Lochstellen ist die Karte
       // wirklich durchsichtig, dort scheint durch, was darunter liegt.
       child: ClipPath(
         clipper: LochStanzung(
           loecher: loecher,
-          layout: _layout,
-          eckenRadius: _eckenRadius,
+          layout: layout,
+          eckenRadius: eckenRadius,
         ),
         // Der Rahmen liegt bewusst NICHT als `border` am Container: ein
         // Border rückt den Inhalt um seine Breite ein, der Clip-Pfad rechnet
@@ -126,13 +161,13 @@ class KartenWidget extends StatelessWidget {
                       karte: k,
                       slots: slots,
                       breite: breite,
-                      layout: _layout,
+                      layout: layout,
                     )
                   : _KompakteKarte(
                       karte: k,
                       slots: slots,
                       breite: breite,
-                      layout: _layout,
+                      layout: layout,
                       rueckseite: rueckseite,
                     ),
             ),
@@ -143,7 +178,7 @@ class KartenWidget extends StatelessWidget {
                     color: seltenheitsFarbe(k.seltenheit),
                     width: breite / 40,
                   ),
-                  borderRadius: BorderRadius.circular(_eckenRadius),
+                  borderRadius: BorderRadius.circular(eckenRadius),
                 ),
               ),
             ),
@@ -161,12 +196,18 @@ class KartenWidget extends StatelessWidget {
 class StapelWidget extends StatelessWidget {
   final Spielfeld feld;
   final double breite;
+  final KartenAnsicht ansicht;
 
-  const StapelWidget({super.key, required this.feld, this.breite = 120});
+  const StapelWidget({
+    super.key,
+    required this.feld,
+    this.breite = 120,
+    this.ansicht = KartenAnsicht.kompakt,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final hoehe = KartenWidget.hoeheFuer(breite, KartenAnsicht.kompakt);
+    final hoehe = KartenWidget.hoeheFuer(breite, ansicht);
     if (feld.istLeer) return _LeeresFeld(breite: breite, hoehe: hoehe);
 
     return SizedBox(
@@ -177,7 +218,11 @@ class StapelWidget extends StatelessWidget {
           // Unterste Karte zuerst, oberste zuletzt.
           for (final lage in feld.stapel.reversed)
             Positioned.fill(
-              child: KartenWidget.handkarte(lage.karte, breite: breite),
+              child: KartenWidget.handkarte(
+                lage.karte,
+                ansicht: ansicht,
+                breite: breite,
+              ),
             ),
         ],
       ),
@@ -275,21 +320,14 @@ class _VolleKarte extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Die Bibelstelle steht schon in der Namensleiste oben —
+                    // hier nur der Text, keine zweite Angabe der Stelle.
                     Expanded(
                       child: SingleChildScrollView(
                         child: Text(
                           karte.vers.text,
                           style: TextStyle(fontSize: breite / 24, height: 1.25),
                         ),
-                      ),
-                    ),
-                    Text(
-                      karte.vers.stelle,
-                      textAlign: TextAlign.right,
-                      style: TextStyle(
-                        fontSize: breite / 24,
-                        fontStyle: FontStyle.italic,
-                        fontWeight: FontWeight.bold,
                       ),
                     ),
                     SizedBox(height: breite / 40),
@@ -349,7 +387,7 @@ class _Namensleiste extends StatelessWidget {
         horizontal: breite / 26,
         vertical: breite / 40,
       ),
-      color: Colors.white.withValues(alpha: 0.92),
+      color: kategorieFarbe(karte.kategorie).withValues(alpha: 0.92),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,

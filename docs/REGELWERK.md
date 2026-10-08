@@ -121,7 +121,7 @@ Feinjustierung von Zahlenwerten in Phase 1b (Simulation).
 | D2 | Deck leer | Kein Nachziehen mehr; kann niemand mehr handeln, gewinnt die höchste Heiligkeit. Das Deck ist die Partie-Uhr |
 | D3 | Stapel | Jedes Feld = ein Stapel, neue Karte immer obenauf, kein Umsortieren (Ausnahme: D10) |
 | D4 | Sofort-Karten | Teilmenge der Karten trägt `sofort`; nur als Reaktion auf eine gegen dich gespielte Evil-Karte, auf das betroffene Feld |
-| D5 | Startspieler | Kein Evil in Runde 1. Zusatzoption „Startspieler zieht nur 4 Karten" bleibt Simulations-Flag (Messung s. u.) |
+| D5 | Startspieler | Kein Evil in Runde 1. Zusatzoption „Startspieler zieht nur 4 Karten" **gemessen und nicht übernommen** (docs/SIMULATION_PHASE1B.md): ändert die Winrate nicht messbar (±0,5 Punkte bei n=1000, im Rauschen). Der Flag bleibt im Code (`RegelConfig.startspielerZiehtNurVier`), Standard ist und bleibt aus |
 | D6 | Evil-Handverstopfung | Keine eigene Sonderregel. Ventil ist der Effekt `erneuerung` (EFFEKTE.md §2.7); Simulation prüft, ob das genügt |
 | D7 | EStart | **Aus den Bestandsdaten übernommen:** alle 6 Slots `-1`, keine Löcher (`strongness -6`) |
 | D8 | Targeting 3+ Spieler | Regel „nur wer diese Runde noch kein Evil bekam" bleibt; Kingmaking wird zunächst zugelassen und in Phase 1b gemessen |
@@ -152,7 +152,7 @@ Decks aus dem Bestand (28 Ressourcen + 7 verschiedene Evil):
 |---|---|---|
 | Partiedauer mit Evil | Median **16 Züge** (9–26) | 15–25 ✅ |
 | Partiedauer ohne Evil | Median 11 Züge | — (zeigt: Evil verlängert um ~5 Züge) |
-| Startspieler-Winrate | **56 %** | 48–52 % ⚠️ → D5-Zusatzoption prüfen |
+| Startspieler-Winrate | **56 %** | 48–52 % ⚠️ → mit vollständiger Bot-Simulation nicht mehr reproduzierbar (51–52,7 %, siehe D5 oben und docs/SIMULATION_PHASE1B.md) |
 | Tiefpunkt Heiligkeit | Median 29, nie 0 erreicht | kein Frust-Aus ✅ |
 | Ertrag pro Zug | Zug 1: −1,4 → Zug 8: +7,9 → Plateau ~+8 | Schneeball vorhanden, aber **gedeckelt** ✅ |
 
