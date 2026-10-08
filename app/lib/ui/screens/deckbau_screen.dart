@@ -339,17 +339,6 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
     );
   }
 
-  /// Klein genug, dass mehrere Karten gleichzeitig sichtbar sind — wie
-  /// Karten, die nebeneinander auf einem Tisch liegen, nicht wie eine
-  /// Diashow mit einer einzigen Hauptkarte. Bewusst konstant: der
-  /// PageController in [_KartenCoverflow] wird nicht neu aufgebaut, wenn
-  /// sich die Fläche ändert (z. B. beim Skalieren des Browserfensters). Eine
-  /// aus der Fläche abgeleitete Fraction lief dadurch mit dem Fenster
-  /// auseinander. Wie groß die Karte selbst innerhalb ihres Ausschnitts
-  /// wird, rechnet [KartenWidget] jetzt allein aus (`breite: null`) — hier
-  /// geht es nur noch darum, wie viele Karten nebeneinander passen.
-  static const double _kViewportFraction = 0.26;
-
   @override
   Widget build(BuildContext context) {
     final fehler = pruefeDeck(_deck);
@@ -431,7 +420,6 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
                     : _KartenCoverflow(
                         key: ValueKey(_deckFilter),
                         karten: deckGefiltert,
-                        viewportFraction: _kViewportFraction,
                         kartenBauen: _deckKarteBauen,
                         onSeiteGeaendert: (i) => setState(() => _deckSeite = i),
                       ),
@@ -474,7 +462,6 @@ class _DeckbauScreenState extends State<DeckbauScreen> {
                     : _KartenCoverflow(
                         key: ValueKey(_filter),
                         karten: gefiltert,
-                        viewportFraction: _kViewportFraction,
                         kartenBauen: _poolKarteBauen,
                         onSeiteGeaendert: (i) => setState(() => _poolSeite = i),
                       ),
@@ -610,55 +597,93 @@ class _KategorieFilter extends StatelessWidget {
 class _KartenCoverflow extends StatefulWidget {
   final List<Karte> karten;
   final Widget Function(Karte) kartenBauen;
-  final double viewportFraction;
   final ValueChanged<int>? onSeiteGeaendert;
 
-  const _KartenCoverflow({
-    super.key,
-    required this.karten,
-    required this.kartenBauen,
-    required this.viewportFraction,
-    this.onSeiteGeaendert,
-  });
+  const _KartenCoverflow({super.key, required this.karten, required this.kartenBauen, this.onSeiteGeaendert});
 
   @override
   State<_KartenCoverflow> createState() => _KartenCoverflowState();
 }
 
 class _KartenCoverflowState extends State<_KartenCoverflow> {
-  late final PageController _controller = PageController(viewportFraction: widget.viewportFraction);
+  PageController? _controller;
+  double? _controllerViewportFraction;
+
+  // Fester Pixel-Abstand statt eines aus der Fläche abgeleiteten Werts —
+  // sonst bestimmt nur noch, wie breit der Ausschnitt pro Karte
+  // (viewportFraction, unten berechnet) über die tatsächliche Kartenbreite
+  // hinausragt, zufällig den Abstand zur Nachbarkarte.
+  static const double _kKartenAbstand = 4;
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
+  /// [viewportFraction] passend zur tatsächlichen Kartenbreite, nicht ein
+  /// fester Bruchteil des Bildschirms: [KartenWidget] selbst bestimmt (über
+  /// `breite: null`) seine Breite aus der verfügbaren Höhe — hier wird exakt
+  /// dieselbe Formel genutzt ([KartenWidget.hoeheFuer] ist dafür öffentlich),
+  /// damit der Ausschnitt pro Karte nie größer ist als die Karte selbst plus
+  /// der feste Abstand. Vorher war der Bruchteil fest auf 0,26 verdrahtet —
+  /// das verhinderte zwar, dass sich der PageController beim Verändern der
+  /// Fensterbreite verselbständigt (siehe [_aktualisiereController]), ließ
+  /// aber auf Bildschirmen, auf denen die Karte höhenbegrenzt (also schmaler
+  /// als ihr Ausschnitt) ist, eine große, zufällige Lücke zur Nachbarkarte.
+  double _viewportFraction(BoxConstraints grenzen) {
+    if (!grenzen.hasBoundedWidth || grenzen.maxWidth <= 0) return 1;
+    final kartenBreiteJeHoeheneinheit = KartenWidget.hoeheFuer(1, KartenAnsicht.voll);
+    final kartenBreite = grenzen.hasBoundedHeight
+        ? (grenzen.maxHeight / kartenBreiteJeHoeheneinheit).clamp(1.0, grenzen.maxWidth)
+        : grenzen.maxWidth;
+    return ((kartenBreite + _kKartenAbstand) / grenzen.maxWidth).clamp(0.05, 1.0);
+  }
+
+  /// Baut den PageController neu, wenn sich [viewportFraction] ändert (z. B.
+  /// beim Skalieren des Browserfensters) — ein `PageController` passt seine
+  /// einmal gesetzte viewportFraction sonst nie wieder an. Die aktuelle Seite
+  /// bleibt dabei erhalten.
+  PageController _aktualisiereController(double viewportFraction) {
+    if (_controller != null && _controllerViewportFraction == viewportFraction) return _controller!;
+    final aktuelleSeite = _controller?.hasClients == true ? _controller!.page?.round() : null;
+    _controller?.dispose();
+    _controllerViewportFraction = viewportFraction;
+    return _controller = PageController(viewportFraction: viewportFraction, initialPage: aktuelleSeite ?? 0);
+  }
+
   @override
-  Widget build(BuildContext context) => PageView.builder(
-    controller: _controller,
-    itemCount: widget.karten.length,
-    onPageChanged: widget.onSeiteGeaendert,
-    itemBuilder: (context, index) => AnimatedBuilder(
-      animation: _controller,
-      builder: (context, kind) {
-        final aktuelleSeite =
-            _controller.hasClients && _controller.position.haveDimensions
-            ? (_controller.page ?? index.toDouble())
-            : index.toDouble();
-        final abstand = (aktuelleSeite - index).abs().clamp(0.0, 1.0);
-        // Nur ein leichter Hinweis, welche Karte gerade "aktiv" ist — die
-        // Karten sollen wie nebeneinander ausgelegt wirken, nicht wie eine
-        // Diashow mit einer stark hervorgehobenen Hauptkarte.
-        return Center(
-          child: Opacity(
-            opacity: 1 - abstand * 0.25,
-            child: Transform.scale(scale: 1 - abstand * 0.08, child: kind),
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, grenzen) {
+      final controller = _aktualisiereController(_viewportFraction(grenzen));
+      return PageView.builder(
+        controller: controller,
+        itemCount: widget.karten.length,
+        onPageChanged: widget.onSeiteGeaendert,
+        itemBuilder: (context, index) => AnimatedBuilder(
+          animation: controller,
+          builder: (context, kind) {
+            final aktuelleSeite = controller.hasClients && controller.position.haveDimensions
+                ? (controller.page ?? index.toDouble())
+                : index.toDouble();
+            final abstand = (aktuelleSeite - index).abs().clamp(0.0, 1.0);
+            // Nur ein leichter Hinweis, welche Karte gerade "aktiv" ist — die
+            // Karten sollen wie nebeneinander ausgelegt wirken, nicht wie
+            // eine Diashow mit einer stark hervorgehobenen Hauptkarte.
+            return Center(
+              child: Opacity(
+                opacity: 1 - abstand * 0.25,
+                child: Transform.scale(scale: 1 - abstand * 0.08, child: kind),
+              ),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: _kKartenAbstand / 2),
+            child: widget.kartenBauen(widget.karten[index]),
           ),
-        );
-      },
-      child: widget.kartenBauen(widget.karten[index]),
-    ),
+        ),
+      );
+    },
   );
 }
 
