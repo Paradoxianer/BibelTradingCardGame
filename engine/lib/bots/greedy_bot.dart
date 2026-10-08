@@ -54,15 +54,33 @@ class GreedyBot implements Bot {
         continue;
       }
 
+      final wahl = _erneuerungWahl(spieler, karte);
       for (var i = 0; i < spieler.spielfelder.length; i++) {
         final neueFelder = List<Spielfeld>.of(spieler.spielfelder);
         neueFelder[i] = neueFelder[i].legeObenauf(karte);
         final kandidat = spieler.copyWith(spielfelder: neueFelder);
         final wert = berechneWertung(state.mitSpieler(kandidat), spielerId).punkte;
-        betrachte(KarteBauen(feldIndex: i, karteId: karte.id), wert);
+        betrachte(KarteBauen(feldIndex: i, karteId: karte.id, effektWahl: wahl), wert);
       }
     }
     return bester ?? const Passen();
+  }
+
+  /// `erneuerung` (EFFEKTE §2.7) ist als Ventil gegen Evil-Handverstopfung
+  /// gedacht (REGELWERK D6) — also mischt der Bot genau die Evil-Karten
+  /// zurück, die er gerade nicht loswird. Ohne Auswahl würde die Karte
+  /// nichts tauschen. Andere Karten tauscht er nicht: ob eine Ressourcenkarte
+  /// "schlecht" ist, hängt vom Board ab und ist nicht Teil dieser Messung.
+  ErneuerungWahl? _erneuerungWahl(Spieler spieler, Karte karte) {
+    final effekt = karte.effekt;
+    if (effekt is! Erneuerung) return null;
+    final restHand = List<Karte>.of(spieler.hand)..remove(karte);
+    final evilIds = restHand
+        .where((k) => k.kategorie == Kategorie.evil)
+        .take(effekt.menge)
+        .map((k) => k.id)
+        .toList();
+    return ErneuerungWahl(evilIds);
   }
 
   Command _besterEvilZug(GameState state, String spielerId) {

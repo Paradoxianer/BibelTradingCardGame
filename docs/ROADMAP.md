@@ -59,7 +59,11 @@ spielbar; alle Regelwerk-Tests grün.
      (±0,5 Punkte, im Rauschen) → **nicht übernommen**, siehe
      docs/SIMULATION_PHASE1B.md und REGELWERK §7.
    - keine Kategorie/Person > ~35 % des Gesamtpunktebeitrags
-   - prüfen, ob `erneuerung` die Evil-Handverstopfung wirklich löst (D6)
+   - prüfen, ob `erneuerung` die Evil-Handverstopfung wirklich löst (D6) —
+     **gemessen:** echte Blockade kommt praktisch nie vor (≤ 0,1 % der
+     Bauphasen), auch ohne Ventil; `erneuerung` lindert nur die teilweise
+     Verstopfung zurückhaltender Spieler um 15–22 %, ohne die Partie zu
+     verlängern. Siehe docs/SIMULATION_PHASE1B.md, Nachtrag 2026-10-08
    - `umordnung` gesondert bewerten (schwer abschätzbarer Effekt)
 3. Regelvarianten (D1, D5, D6) im A/B-Vergleich → **Entscheidungen fixieren,
    REGELWERK auf v1.0 heben.**
