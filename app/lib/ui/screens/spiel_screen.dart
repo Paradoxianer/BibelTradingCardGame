@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:btcg_engine/engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -26,16 +28,36 @@ const BoxDecoration _bretthintergrund = BoxDecoration(
   ),
 );
 
-/// Nur zwei Zustände, keine Zwischengrößen (keep it simple): auf schmalen
-/// (Handy-)Bildschirmen die bisherige kompakte Darstellung, auf breiten
-/// (Tablet/Desktop-)Bildschirmen direkt dieselbe Vollansicht wie in der
-/// Großansicht per Doppeltipp — echte Kartengröße mit Bibeltext, statt nur
-/// einer größer skalierten kompakten Karte (Issue #8).
-({KartenAnsicht ansicht, double breite}) kartenDarstellungFuerBildschirm(
-  double bildschirmBreite,
-) => bildschirmBreite >= 1200
-    ? (ansicht: KartenAnsicht.voll, breite: 320.0)
-    : (ansicht: KartenAnsicht.kompakt, breite: 120.0);
+/// Platz im Spielbrett, den nicht die großen Karten belegen: Kopfzeilen,
+/// Abstände, Rahmen und Punkteanzeigen beider Bereiche plus die verdeckte
+/// (bewusst kleine) Gegnerhand bzw. Ziehstapel und Ränder in der Breite.
+const double _kNebenflaecheHoehe = 260;
+const double _kNebenflaecheBreite = 160;
+
+/// Kleiner als das wird der Bibeltext der Vollansicht unlesbar; größer als
+/// die Großansicht per Doppeltipp muss eine Karte nie werden.
+const double _kVollMindestbreite = 200;
+const double _kVollHoechstbreite = 320;
+
+/// Nur zwei Zustände, keine Zwischengrößen (keep it simple): die bisherige
+/// kompakte Darstellung oder dieselbe Vollansicht wie die Großansicht per
+/// Doppeltipp — echte Kartengröße mit Bibeltext (Issue #8).
+///
+/// Entscheidet anhand der tatsächlich verfügbaren [flaeche] des Spielbretts,
+/// nicht nur der Bildschirmbreite: übereinander liegen drei Reihen großer
+/// Karten (Gegnerfelder, eigene Felder, eigene Hand), nebeneinander bis zu
+/// vier Felder plus Ziehstapel. Die Vollansicht kommt nur, wenn das alles
+/// ohne Scrollen hineinpasst — sonst war auf einem breiten, aber flachen
+/// Fenster (z. B. 1920×953) die eigene Hand nicht mehr zu sehen.
+({KartenAnsicht ansicht, double breite}) kartenDarstellungFuer(Size flaeche) {
+  final ausHoehe =
+      (flaeche.height - _kNebenflaecheHoehe) / (3 * KartenWidget.hoeheFuer(1, KartenAnsicht.voll));
+  final ausBreite = (flaeche.width - _kNebenflaecheBreite) / 4;
+  final breite = min(_kVollHoechstbreite, min(ausHoehe, ausBreite));
+  return breite >= _kVollMindestbreite
+      ? (ansicht: KartenAnsicht.voll, breite: breite.floorToDouble())
+      : (ansicht: KartenAnsicht.kompakt, breite: 120.0);
+}
 
 class SpielScreen extends StatelessWidget {
   final VoidCallback onNeuesSpiel;
@@ -71,7 +93,6 @@ class _SpielBrett extends StatelessWidget {
   Widget build(BuildContext context) {
     final spiel = state.spiel;
     final aktiver = spiel.aktiverSpieler;
-    final darstellung = kartenDarstellungFuerBildschirm(MediaQuery.sizeOf(context).width);
 
     return Scaffold(
       appBar: AppBar(title: Text(_phaseName(spiel.phase))),
@@ -90,30 +111,36 @@ class _SpielBrett extends StatelessWidget {
                 ),
               ),
             Expanded(
-              child: SingleChildScrollView(
-                // Alle Spieler in derselben Darstellung — der eigene Bereich
-                // ist kein Sonderfall, nur die Rechte unterscheiden sich.
-                child: Column(
-                  children: [
-                    // Man sitzt sich gegenüber: die Mitspieler oben, der
-                    // eigene Bereich unten vor einem.
-                    for (final s in spiel.spieler.where((s) => s.id != aktiver.id))
-                      _Bereich(
-                        spieler: s,
-                        state: state,
-                        eigen: false,
-                        ansicht: darstellung.ansicht,
-                        feldBreite: darstellung.breite,
-                      ),
-                    _Bereich(
-                      spieler: aktiver,
-                      state: state,
-                      eigen: true,
-                      ansicht: darstellung.ansicht,
-                      feldBreite: darstellung.breite,
+              child: LayoutBuilder(
+                builder: (context, flaeche) {
+                  final darstellung = kartenDarstellungFuer(flaeche.biggest);
+                  return SingleChildScrollView(
+                    // Alle Spieler in derselben Darstellung — der eigene
+                    // Bereich ist kein Sonderfall, nur die Rechte
+                    // unterscheiden sich.
+                    child: Column(
+                      children: [
+                        // Man sitzt sich gegenüber: die Mitspieler oben, der
+                        // eigene Bereich unten vor einem.
+                        for (final s in spiel.spieler.where((s) => s.id != aktiver.id))
+                          _Bereich(
+                            spieler: s,
+                            state: state,
+                            eigen: false,
+                            ansicht: darstellung.ansicht,
+                            feldBreite: darstellung.breite,
+                          ),
+                        _Bereich(
+                          spieler: aktiver,
+                          state: state,
+                          eigen: true,
+                          ansicht: darstellung.ansicht,
+                          feldBreite: darstellung.breite,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
             if (spiel.phase == ZugPhase.reaktion)
