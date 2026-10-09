@@ -9,10 +9,56 @@ class SimulatorConfig {
   final bool mitEvil;
   final bool startspielerZiehtNurVier; // D5-Zusatzoption
 
+  /// D6-Experiment: so viele Ressourcenkarten je Deck tragen testweise den
+  /// Effekt `erneuerung` (EFFEKTE §2.7). Das Basis-Set enthält (noch) keine
+  /// einzige solche Karte — ohne diese Option lässt sich das Ventil gar nicht
+  /// messen. Slots und Kategorie der Karte bleiben gleich, nur der Effekt
+  /// kommt hinzu, damit die Wertung selbst unverändert bleibt.
+  final int erneuerungKopien;
+  final int erneuerungMenge;
+
   const SimulatorConfig({
     this.mitEvil = true,
     this.startspielerZiehtNurVier = false,
+    this.erneuerungKopien = 0,
+    this.erneuerungMenge = 2,
   });
+}
+
+/// Kennzeichnet testweise mit `erneuerung` versehene Karten (eigene ID,
+/// sonst wären sie per `==` nicht vom Original zu unterscheiden).
+const kErneuerungSuffix = '-ERN';
+
+Karte _mitErneuerung(Karte k, int menge) => Karte(
+  id: '${k.id}$kErneuerungSuffix',
+  cardId: k.cardId,
+  name: k.name,
+  vers: k.vers,
+  slots: k.slots,
+  kategorie: k.kategorie,
+  seltenheit: k.seltenheit,
+  sofort: k.sofort,
+  effekt: Erneuerung(menge),
+  anzahlImDeckMax: k.anzahlImDeckMax,
+  pictureLink: k.pictureLink,
+);
+
+/// Ersetzt die ersten [kopien] Ressourcenkarten des (bereits gemischten)
+/// Decks — also zufällig gewählte — durch ihre `erneuerung`-Variante.
+SpielerAufbau _mitErneuerungsKarten(SpielerAufbau aufbau, int kopien, int menge) {
+  if (kopien <= 0) return aufbau;
+  var rest = kopien;
+  final deck = [
+    for (final k in aufbau.deck)
+      if (rest > 0 && k.kategorie != Kategorie.evil && k.effekt == null)
+        () {
+          rest--;
+          return _mitErneuerung(k, menge);
+        }()
+      else
+        k,
+  ];
+  return SpielerAufbau(id: aufbau.id, name: aufbau.name, deck: deck, eStart: aufbau.eStart);
 }
 
 class Partieergebnis {
@@ -28,6 +74,14 @@ class Partieergebnis {
   final List<int> wertungsWerte; // Punkte je Wertungsphase (Spannungskurve)
   final Map<String, int> gespielteKarten; // Kartenvielfalt
 
+  /// D6-Metriken, gezählt zu Beginn jeder Bauphase des aktiven Spielers:
+  /// wie viele Bauphasen insgesamt, Summe der Evil-Karten in der Hand, und
+  /// in wie vielen davon die Hand *nur* aus Evil bestand (nichts baubar).
+  final int bauphasen;
+  final int evilInHandSumme;
+  final int komplettVerstopft;
+  final int erneuerungGespielt;
+
   const Partieergebnis({
     required this.seed,
     required this.zuege,
@@ -40,6 +94,10 @@ class Partieergebnis {
     required this.fuehrungswechsel,
     required this.wertungsWerte,
     required this.gespielteKarten,
+    this.bauphasen = 0,
+    this.evilInHandSumme = 0,
+    this.komplettVerstopft = 0,
+    this.erneuerungGespielt = 0,
   });
 }
 
@@ -87,8 +145,12 @@ Partieergebnis spielePartieMitMetriken({
   int maxCommands = 20000,
 }) {
   final aufbau = [
-    _baueDeck(id: 'p1', kartenpool: kartenpool, seed: seed, mitEvil: config.mitEvil),
-    _baueDeck(id: 'p2', kartenpool: kartenpool, seed: seed + 1, mitEvil: config.mitEvil),
+    for (final (id, s) in [('p1', seed), ('p2', seed + 1)])
+      _mitErneuerungsKarten(
+        _baueDeck(id: id, kartenpool: kartenpool, seed: s, mitEvil: config.mitEvil),
+        config.erneuerungKopien,
+        config.erneuerungMenge,
+      ),
   ];
   var state = neuesSpiel(
     spieler: aufbau,
@@ -110,6 +172,9 @@ Partieergebnis spielePartieMitMetriken({
       .reduce((a, b) => a.heiligkeit >= b.heiligkeit ? a : b)
       .id;
   var fuehrungswechsel = 0;
+  var bauphasen = 0;
+  var evilInHandSumme = 0;
+  var komplettVerstopft = 0;
 
   void zaehleKarteGespielt(String karteId) {
     gespielteKarten.update(karteId, (v) => v + 1, ifAbsent: () => 1);
@@ -129,6 +194,10 @@ Partieergebnis spielePartieMitMetriken({
         fuehrungswechsel: fuehrungswechsel,
         wertungsWerte: wertungsWerte,
         gespielteKarten: gespielteKarten,
+        bauphasen: bauphasen,
+        evilInHandSumme: evilInHandSumme,
+        komplettVerstopft: komplettVerstopft,
+        erneuerungGespielt: _erneuerungGespielt(gespielteKarten),
       );
     }
 
@@ -137,6 +206,14 @@ Partieergebnis spielePartieMitMetriken({
     final handelnderId = state.phase == ZugPhase.reaktion
         ? state.pendingEvilOpferId!
         : state.aktiverSpieler.id;
+
+    if (state.phase == ZugPhase.bauen) {
+      final hand = state.aktiverSpieler.hand;
+      final evil = hand.where((k) => k.kategorie == Kategorie.evil).length;
+      bauphasen++;
+      evilInHandSumme += evil;
+      if (hand.isNotEmpty && evil == hand.length) komplettVerstopft++;
+    }
 
     final Command command;
     if (istEvilPhaseDeaktiviert) {
@@ -209,8 +286,16 @@ Partieergebnis spielePartieMitMetriken({
     fuehrungswechsel: fuehrungswechsel,
     wertungsWerte: wertungsWerte,
     gespielteKarten: gespielteKarten,
+    bauphasen: bauphasen,
+    evilInHandSumme: evilInHandSumme,
+    komplettVerstopft: komplettVerstopft,
+    erneuerungGespielt: _erneuerungGespielt(gespielteKarten),
   );
 }
+
+int _erneuerungGespielt(Map<String, int> gespielt) => gespielt.entries
+    .where((e) => e.key.endsWith(kErneuerungSuffix))
+    .fold(0, (s, e) => s + e.value);
 
 double median(List<int> werte) {
   if (werte.isEmpty) return 0;
@@ -245,6 +330,13 @@ class SammelErgebnis {
   final List<int> alleWertungsWerte;
   final Map<String, int> gespielteKartenGesamt;
   final int kartenpoolGroesse;
+  final int bauphasen;
+  final int evilInHandSumme;
+  final int komplettVerstopft;
+  final int erneuerungGespielt;
+
+  /// Partien, in denen mindestens eine Bauphase komplett verstopft war.
+  final int partienMitVerstopfung;
 
   const SammelErgebnis({
     required this.anzahlPartien,
@@ -258,7 +350,19 @@ class SammelErgebnis {
     required this.alleWertungsWerte,
     required this.gespielteKartenGesamt,
     required this.kartenpoolGroesse,
+    this.bauphasen = 0,
+    this.evilInHandSumme = 0,
+    this.komplettVerstopft = 0,
+    this.erneuerungGespielt = 0,
+    this.partienMitVerstopfung = 0,
   });
+
+  /// Ø Evil-Karten in der Hand zu Beginn einer Bauphase (Hand max. 5).
+  double get evilInHandSchnitt => bauphasen == 0 ? 0 : evilInHandSumme / bauphasen;
+
+  /// Anteil der Bauphasen, in denen nichts gebaut werden konnte, weil die
+  /// Hand nur aus Evil bestand.
+  double get verstopftAnteil => bauphasen == 0 ? 0 : komplettVerstopft / bauphasen;
 
   int get beendet => anzahlPartien - abgebrochen;
   double get medianZuege => median(zuege);
@@ -320,6 +424,11 @@ SammelErgebnis simuliere({
   final fuehrungswechsel = <int>[];
   final alleWertungsWerte = <int>[];
   final gespielteKartenGesamt = <String, int>{};
+  var bauphasen = 0;
+  var evilInHandSumme = 0;
+  var komplettVerstopft = 0;
+  var erneuerungGespielt = 0;
+  var partienMitVerstopfung = 0;
 
   for (var i = 0; i < anzahlPartien; i++) {
     final seed = startSeed + i * 10;
@@ -334,6 +443,11 @@ SammelErgebnis simuliere({
     tiefpunkte.add(ergebnis.tiefpunktHeiligkeit);
     fuehrungswechsel.add(ergebnis.fuehrungswechsel);
     alleWertungsWerte.addAll(ergebnis.wertungsWerte);
+    bauphasen += ergebnis.bauphasen;
+    evilInHandSumme += ergebnis.evilInHandSumme;
+    komplettVerstopft += ergebnis.komplettVerstopft;
+    erneuerungGespielt += ergebnis.erneuerungGespielt;
+    if (ergebnis.komplettVerstopft > 0) partienMitVerstopfung++;
     for (final e in ergebnis.gespielteKarten.entries) {
       gespielteKartenGesamt.update(e.key, (v) => v + e.value, ifAbsent: () => e.value);
     }
@@ -357,6 +471,11 @@ SammelErgebnis simuliere({
     alleWertungsWerte: alleWertungsWerte,
     gespielteKartenGesamt: gespielteKartenGesamt,
     kartenpoolGroesse: kartenpool.length,
+    bauphasen: bauphasen,
+    evilInHandSumme: evilInHandSumme,
+    komplettVerstopft: komplettVerstopft,
+    erneuerungGespielt: erneuerungGespielt,
+    partienMitVerstopfung: partienMitVerstopfung,
     zuege: zuege,
     tiefpunkte: tiefpunkte,
     startspielerSiege: startspielerSiege,

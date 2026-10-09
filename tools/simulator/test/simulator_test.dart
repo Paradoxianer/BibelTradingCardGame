@@ -51,6 +51,30 @@ void main() {
       expect(ergebnis.zuege, greaterThan(0));
     });
 
+    test('D6-Experiment: erneuerung-Karten landen im Deck, werden gespielt, Bauphasen werden gezählt', () {
+      final ohne = simuliere(
+        anzahlPartien: 20,
+        startSeed: 100,
+        kartenpool: _kartenpool(),
+        bot1Fabrik: () => const GreedyBot(),
+        bot2Fabrik: () => const GreedyBot(),
+      );
+      final mit = simuliere(
+        anzahlPartien: 20,
+        startSeed: 100,
+        kartenpool: _kartenpool(),
+        bot1Fabrik: () => const GreedyBot(),
+        bot2Fabrik: () => const GreedyBot(),
+        config: const SimulatorConfig(erneuerungKopien: 2),
+      );
+
+      expect(ohne.erneuerungGespielt, 0, reason: 'Ohne Option gibt es keine erneuerung-Karten');
+      expect(mit.erneuerungGespielt, greaterThan(0));
+      expect(mit.gespielteKartenGesamt.keys, contains(endsWith(kErneuerungSuffix)));
+      expect(mit.bauphasen, greaterThan(0));
+      expect(mit.evilInHandSchnitt, inInclusiveRange(0, 5));
+    });
+
     test('simuliere aggregiert über mehrere Partien', () {
       final ergebnis = simuliere(
         anzahlPartien: 20,

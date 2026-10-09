@@ -179,12 +179,70 @@ wird nicht übernommen** — der Flag bleibt im Code (`RegelConfig.
 startspielerZiehtNurVier`, per CLI: `--startspieler-vier`) für spätere
 Nachmessungen (z. B. sobald `tun`/`lehre` befüllt sind), Standard bleibt aus.
 
+## Nachtrag 2026-10-08 — D6: Evil-Handverstopfung und `erneuerung` (#4)
+
+**Frage:** Reicht es, dass Evil-Handverstopfung keine eigene Sonderregel hat
+und `erneuerung` (EFFEKTE §2.7) als Ventil dient (REGELWERK D6)?
+
+**Problem vorab:** Im Basis-Set trägt keine der 106 Karten einen Effekt, also
+auch keine `erneuerung`. Das Ventil existiert in den Daten gar nicht. Der
+Simulator hat deshalb die Testoption `--erneuerung N` bekommen: N zufällige
+Ressourcenkarten je Deck erhalten den Effekt `erneuerung` (menge 2), Slots
+und Kategorie bleiben gleich. Die echten Kartendaten bleiben unangetastet.
+`GreedyBot` (und damit auch `DefensivBot` beim Bauen) mischt beim Bauen
+einer solchen Karte die Evil-Karten seiner Hand zurück. Vorher gab er keine
+Auswahl mit, sodass die Karte nichts getauscht hätte.
+
+**Messgrößen** (zu Beginn jeder Bauphase des aktiven Spielers):
+Ø Evil-Karten in der Hand (Hand max. 5) und Anteil der Bauphasen, in denen
+die Hand *nur* aus Evil besteht (nichts baubar).
+
+n=500 je Zeile, Seed 42:
+
+| Paarung | erneuerung je Deck | Ø Evil in Hand | reine Evil-Hand | Partien betroffen | Partiedauer (Median) |
+|---|---|---|---|---|---|
+| Greedy vs. Greedy | 0 | 0,41 | 0,0 % | 0/500 | 31 |
+| Greedy vs. Greedy | 2 | 0,41 | 0,0 % | 0/500 | 31 |
+| Defensiv vs. Defensiv | 0 | 2,02 | 0,1 % | 10/500 | 23 |
+| Defensiv vs. Defensiv | 1 | 1,88 | 0,1 % | 7/500 | 23 |
+| Defensiv vs. Defensiv | 2 | 1,71 | 0,1 % | 6/500 | 22 |
+| Defensiv vs. Greedy | 0 | 1,25 | 0,0 % | 4/500 | 23,5 |
+| Defensiv vs. Greedy | 2 | 1,08 | 0,1 % | 6/500 | 23 |
+
+Gegenprobe Defensiv vs. Defensiv, Seed 7: 1,93 → 1,63 (2 Kopien) → 1,50
+(3 Kopien). Reine Evil-Hände 6 → 2 → 1 von 500 Partien.
+
+**Befund:**
+
+1. **Echte Blockade (nichts baubar) kommt praktisch nicht vor**, selbst
+   nicht ohne Ventil: höchstens 0,1 % der Bauphasen, und nur bei einem Bot,
+   der Evil bewusst zurückhält. Wer Evil spielt, wird es los. Pro Runde darf
+   man genau eine Evil-Karte auf den Gegner legen, das genügt bei 7 Evil-
+   Karten in 35.
+2. **Teilweise Verstopfung gibt es — aber nur bei Zurückhaltung.** Ein
+   Spieler, der Evil nur notgedrungen spielt, trägt im Schnitt rund 2 von 5
+   Handplätzen mit Evil herum. Das ist eine selbst gewählte Einschränkung
+   (weniger Bauoptionen), keine Regel-Sackgasse.
+3. **`erneuerung` lindert genau diese teilweise Verstopfung, aber mäßig:**
+   −15 % Evil in der Hand bei 2 Kopien, −22 % bei 3. Bei aggressiver
+   Spielweise wirkungslos (Evil ist dort ohnehin nach einem Zug weg).
+4. **Die befürchtete Partieverlängerung (EFFEKTE §2.7, Wechselwirkung mit D2)
+   tritt nicht auf:** Median unverändert bzw. 1 Zug kürzer. Startspieler-
+   Winrate bleibt im Rauschen.
+
+**Einordnung für D6:** "Keine eigene Sonderregel" reicht nach dieser
+Messung. Sie reicht sogar ohne `erneuerung`-Karten im Set. `erneuerung` ist
+ein sinnvolles, ungefährliches Komfort-Ventil für zurückhaltende Spieler,
+aber keine Notwendigkeit. Grenzen: nur 2 Spieler, nur Bots. Ob Menschen
+Evil öfter zurückhalten als `DefensivBot`, zeigen erst Playtests (#7).
+
 ## Bekannte Grenzen
 
 - **Keine Effektkarten im Bestand** (alle 106 Karten: `effekt: null`) — die
   Effekt-Resolver der Engine sind getestet, aber diese Simulation sagt
   nichts über `umkehrung`, `schutz`, `suche` usw. aus, weil keine Karte sie
-  trägt.
+  trägt. Ausnahme: `erneuerung` wurde für D6 per Testoption künstlich
+  eingemischt (siehe Nachtrag 2026-10-08).
 - **Keine `sofort`-Karten im Bestand** — die Reaktion-Phase kommt in dieser
   Simulation nie zum Einsatz.
 - Bot-Heuristiken sind Näherungen, keine optimalen Spieler — absolute Zahlen
@@ -201,6 +259,7 @@ cd tools/simulator
 dart run bin/simulator.dart --spiele 300 --seed 1 --bot1 greedy --bot2 greedy
 dart run bin/simulator.dart --spiele 300 --seed 1 --bot1 greedy --bot2 greedy --ohne-evil
 dart run bin/simulator.dart --spiele 300 --seed 1 --bot1 greedy --bot2 greedy --startspieler-vier
+dart run bin/simulator.dart --spiele 500 --bot1 defensiv --bot2 defensiv --erneuerung 2  # D6
 # --bot1/--bot2: greedy | zufall | defensiv | anfuehrer
 
 dart run bin/spezialisierung.dart --spiele 300 --seed 1

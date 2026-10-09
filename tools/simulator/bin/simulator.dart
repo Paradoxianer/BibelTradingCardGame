@@ -22,6 +22,8 @@ void main(List<String> arguments) {
   var mitEvil = true;
   var startspielerVier = false;
   var inputPfad = '../../data/sets/base.json';
+  var erneuerungKopien = 0;
+  var erneuerungMenge = 2;
 
   for (var i = 0; i < arguments.length; i++) {
     switch (arguments[i]) {
@@ -39,6 +41,10 @@ void main(List<String> arguments) {
         startspielerVier = true;
       case '--input':
         inputPfad = arguments[++i];
+      case '--erneuerung':
+        erneuerungKopien = int.parse(arguments[++i]);
+      case '--erneuerung-menge':
+        erneuerungMenge = int.parse(arguments[++i]);
     }
   }
 
@@ -48,6 +54,8 @@ void main(List<String> arguments) {
   final config = SimulatorConfig(
     mitEvil: mitEvil,
     startspielerZiehtNurVier: startspielerVier,
+    erneuerungKopien: erneuerungKopien,
+    erneuerungMenge: erneuerungMenge,
   );
 
   final ergebnis = simuliere(
@@ -61,7 +69,8 @@ void main(List<String> arguments) {
 
   print('Simulation: $spiele Partien, $bot1 vs. $bot2, '
       'Evil ${mitEvil ? "an" : "aus"}, '
-      'D5 (Startspieler 4 Karten) ${startspielerVier ? "an" : "aus"}');
+      'D5 (Startspieler 4 Karten) ${startspielerVier ? "an" : "aus"}, '
+      'erneuerung: ${erneuerungKopien}x je Deck (menge $erneuerungMenge)');
   print('Kartenpool: ${kartenset.alleKarten.length} Karten (Set ${kartenset.set})');
   print('');
   print('Beendet: ${ergebnis.beendet}/${ergebnis.anzahlPartien}'
@@ -72,6 +81,16 @@ void main(List<String> arguments) {
   print('Startspieler-Winrate: ${(ergebnis.startspielerWinrate * 100).toStringAsFixed(1)}%'
       ' (Zielwert 48-52%)');
   print('Tiefpunkt Heiligkeit (Minimum über alle Partien): ${ergebnis.minTiefpunkt}');
+  print('');
+  print('Evil-Handverstopfung (D6):');
+  print('  Ø Evil-Karten in der Hand je Bauphase: '
+      '${ergebnis.evilInHandSchnitt.toStringAsFixed(2)}');
+  print('  Bauphasen mit reiner Evil-Hand (nichts baubar): '
+      '${(ergebnis.verstopftAnteil * 100).toStringAsFixed(1)}% '
+      '(${ergebnis.komplettVerstopft}/${ergebnis.bauphasen})');
+  print('  Partien mit mind. einer solchen Bauphase: '
+      '${ergebnis.partienMitVerstopfung}/${ergebnis.anzahlPartien}');
+  print('  erneuerung-Karten gespielt: ${ergebnis.erneuerungGespielt}');
   print('');
   print('Spieldynamik:');
   print('  Führungswechsel je Partie (Median): '
