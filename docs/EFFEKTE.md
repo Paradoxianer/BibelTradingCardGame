@@ -113,8 +113,9 @@ ebenso viele nach.
 - `parameter.menge`: int ≥ 1 (Richtwert 2–3)
 - `dauer`: `sofort`
 - Design-Hinweise:
-  - Wichtigstes Ventil gegen Evil-Handverstopfung (REGELWERK D6) — ggf. macht
-    diese Karte die Sonderregel D6-A überflüssig; per Simulation prüfen.
+  - Ventil gegen Evil-Handverstopfung (REGELWERK D6) — laut Simulation
+    **nicht nötig** (echte Blockade kommt praktisch nie vor), aber als
+    Komfort-Ventil für zurückhaltende Spieler sinnvoll und ungefährlich.
   - Wechselwirkung mit D2 (Deck als Partie-Uhr): `erneuerung` verlängert die
     Partie um bis zu `menge` Züge. Deshalb `menge` klein halten und Karte
     auf `anzahlImDeckMax: 1–2` begrenzen.
