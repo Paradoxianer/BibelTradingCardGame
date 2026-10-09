@@ -27,7 +27,7 @@ einchecken, README erneuern. Danach Phase 1 Schritt 1 (Datenmodell + Parser)
 
 ## Offen (nicht eigenmächtig entscheiden!)
 
-- **D1–D10 sind alle entschieden** (docs/REGELWERK.md §7, v0.9). Nicht neu
+- **D1–D10 sind alle entschieden** (docs/REGELWERK.md §7, v1.0). Nicht neu
   aufrollen. Offen sind nur noch Zahlenwerte, die die Simulation in Phase 1b
   klärt — insbesondere der gemessene Startspielervorteil von 56 %.
 - **Effekt-System:** definiert in **docs/EFFEKTE.md** (v0.3, freigegeben):

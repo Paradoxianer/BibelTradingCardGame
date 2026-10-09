@@ -1,7 +1,9 @@
-# Regelwerk v0.9 — BibelTradingCardGame
+# Regelwerk v1.0 — BibelTradingCardGame
 
-> **Status:** Regeln vollständig entschieden (§7), Zahlenwerte noch in
-> Feinjustierung (Phase 1b, Simulation). Dieses Dokument ist die **Source of
+> **Status:** v1.0 (2026-10-09) — Regeln final. Alle D-Punkte sind
+> entschieden und, wo per Simulation prüfbar, gemessen (§7,
+> docs/SIMULATION_PHASE1B.md). Weiter justiert werden nur Kartendaten
+> (Werte, Kategorie-Balance); das ändert keine Regel. Dieses Dokument ist die **Source of
 > Truth** für die Spiel-Engine: Jede Regel hier muss eindeutig implementierbar
 > sein. Kartendaten und -format: KARTEN_SPEZIFIKATION.md · Effekte: EFFEKTE.md
 
@@ -112,12 +114,13 @@ jede Runde erneut gewertet. Das ist gewollt, birgt aber Schneeball-Risiko
 
 ## 7. Entscheidungen
 
-Stand 2026-07-26. **Alle D-Punkte sind entschieden**; offen ist nur noch die
-Feinjustierung von Zahlenwerten in Phase 1b (Simulation).
+Stand 2026-10-09 (v1.0). **Alle D-Punkte sind entschieden**; D1, D5, D6
+und D10 zusätzlich per Simulation gemessen (docs/SIMULATION_PHASE1B.md).
+Offen ist nur noch die Feinjustierung der Kartendaten in Phase 1b.
 
 | # | Thema | Entscheidung |
 |---|---|---|
-| D1 | Evil-Platzierung | **Angreifer wählt** eines der 3 Felder des Ziels, Karte kommt obenauf |
+| D1 | Evil-Platzierung | **Angreifer wählt** eines der 3 Felder des Ziels, Karte kommt obenauf. **Gemessen** gegen „Opfer wählt“ und „Zufall“ (docs/SIMULATION_PHASE1B.md, Nachtrag 2026-10-09): nur mit dieser Variante bremst Evil den Führenden genug — Startspieler-Winrate 53 % statt 57 % (Zufall) bzw. 65 % (Opfer wählt) |
 | D2 | Deck leer | Kein Nachziehen mehr; kann niemand mehr handeln, gewinnt die höchste Heiligkeit. Das Deck ist die Partie-Uhr |
 | D3 | Stapel | Jedes Feld = ein Stapel, neue Karte immer obenauf, kein Umsortieren (Ausnahme: D10) |
 | D4 | Sofort-Karten | Teilmenge der Karten trägt `sofort`; nur als Reaktion auf eine gegen dich gespielte Evil-Karte, auf das betroffene Feld |

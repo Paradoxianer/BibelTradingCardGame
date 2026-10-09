@@ -75,6 +75,21 @@ void main() {
       expect(mit.evilInHandSchnitt, inInclusiveRange(0, 5));
     });
 
+    test('D1-Varianten: wählt das Opfer das Feld, richtet Evil weniger Schaden an', () {
+      SammelErgebnis lauf(EvilFeldWahl wahl) => simuliere(
+        anzahlPartien: 20,
+        startSeed: 100,
+        kartenpool: _kartenpool(),
+        bot1Fabrik: () => const GreedyBot(),
+        bot2Fabrik: () => const GreedyBot(),
+        config: SimulatorConfig(evilFeldWahl: wahl),
+      );
+      final angreifer = lauf(EvilFeldWahl.angreifer);
+      final opfer = lauf(EvilFeldWahl.opfer);
+      expect(angreifer.evilEinsaetze, greaterThan(0));
+      expect(opfer.evilSchadenSchnitt, lessThan(angreifer.evilSchadenSchnitt));
+    });
+
     test('simuliere aggregiert über mehrere Partien', () {
       final ergebnis = simuliere(
         anzahlPartien: 20,

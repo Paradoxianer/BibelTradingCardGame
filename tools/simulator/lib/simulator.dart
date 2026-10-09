@@ -7,6 +7,11 @@ import 'effektwert.dart';
 
 /// Ob Evil überhaupt gespielt werden darf (REGELWERK §7 Baseline-Messung
 /// vergleicht "mit Evil" gegen "ohne Evil" bei sonst identischem Deck).
+/// D1-Varianten: wer bestimmt, auf welches Feld des Ziels eine Evil-Karte
+/// kommt. REGELWERK D1 hat "Angreifer wählt" entschieden; die anderen beiden
+/// existieren nur hier im Simulator, für den A/B-Vergleich (#6).
+enum EvilFeldWahl { angreifer, opfer, zufall }
+
 class SimulatorConfig {
   final bool mitEvil;
   final bool startspielerZiehtNurVier; // D5-Zusatzoption
@@ -23,12 +28,15 @@ class SimulatorConfig {
   /// testweise `umordnung` (eigene Variante, EFFEKTE §2.8).
   final int umordnungKopien;
 
+  final EvilFeldWahl evilFeldWahl;
+
   const SimulatorConfig({
     this.mitEvil = true,
     this.startspielerZiehtNurVier = false,
     this.erneuerungKopien = 0,
     this.erneuerungMenge = 2,
     this.umordnungKopien = 0,
+    this.evilFeldWahl = EvilFeldWahl.angreifer,
   });
 }
 
@@ -77,6 +85,11 @@ class Partieergebnis {
   final int komplettVerstopft;
   final int erneuerungGespielt;
 
+  /// D1: wie viele Punkte eine Evil-Karte dem Ziel direkt kostet (Wertung
+  /// des Ziels vor minus nach dem Ablegen), summiert über alle Einsätze.
+  final int evilEinsaetze;
+  final int evilSchadenSumme;
+
   const Partieergebnis({
     required this.seed,
     required this.zuege,
@@ -93,7 +106,42 @@ class Partieergebnis {
     this.evilInHandSumme = 0,
     this.komplettVerstopft = 0,
     this.erneuerungGespielt = 0,
+    this.evilEinsaetze = 0,
+    this.evilSchadenSumme = 0,
   });
+}
+
+/// Wendet die D1-Variante an: ersetzt das vom Angreifer gewählte Feld.
+EvilSpielen _evilFeldNachVariante(
+  GameState state,
+  EvilSpielen command,
+  EvilFeldWahl wahl,
+  SeedableRng feldRng,
+  void Function(SeedableRng) neuerRng,
+) {
+  if (wahl == EvilFeldWahl.angreifer) return command;
+  final ziel = state.spielerMitId(command.zielSpielerId);
+  final karte = state.aktiverSpieler.hand.firstWhere((k) => k.id == command.karteId);
+  int feld;
+  if (wahl == EvilFeldWahl.zufall) {
+    final (f, rng) = feldRng.naechsteZahl(ziel.spielfelder.length);
+    neuerRng(rng);
+    feld = f;
+  } else {
+    // Opfer wählt: das Feld, auf dem die Evil-Karte am wenigsten schadet.
+    feld = 0;
+    var bester = -(1 << 30);
+    for (var f = 0; f < ziel.spielfelder.length; f++) {
+      final felder = List<Spielfeld>.of(ziel.spielfelder);
+      felder[f] = felder[f].legeObenauf(karte);
+      final wert = berechneWertung(state.mitSpieler(ziel.copyWith(spielfelder: felder)), ziel.id).punkte;
+      if (wert > bester) {
+        bester = wert;
+        feld = f;
+      }
+    }
+  }
+  return EvilSpielen(zielSpielerId: command.zielSpielerId, zielFeldIndex: feld, karteId: command.karteId);
 }
 
 /// Baut das Deck für eine Partie. Bei `mitEvil: false` ganz ohne Evil-Karten
@@ -176,6 +224,9 @@ Partieergebnis spielePartieMitMetriken({
   var bauphasen = 0;
   var evilInHandSumme = 0;
   var komplettVerstopft = 0;
+  var evilEinsaetze = 0;
+  var evilSchadenSumme = 0;
+  var feldRng = SeedableRng.seeded(seed + 4);
 
   void zaehleKarteGespielt(String karteId) {
     gespielteKarten.update(karteId, (v) => v + 1, ifAbsent: () => 1);
@@ -199,6 +250,8 @@ Partieergebnis spielePartieMitMetriken({
         evilInHandSumme: evilInHandSumme,
         komplettVerstopft: komplettVerstopft,
         erneuerungGespielt: _erneuerungGespielt(gespielteKarten),
+        evilEinsaetze: evilEinsaetze,
+        evilSchadenSumme: evilSchadenSumme,
       );
     }
 
@@ -229,7 +282,22 @@ Partieergebnis spielePartieMitMetriken({
       command = gewaehlt;
     }
 
-    final (neuerState, events) = engine.apply(state, command);
+    var ausgefuehrt = command;
+    int? zielWertungVorher;
+    if (ausgefuehrt is EvilSpielen) {
+      ausgefuehrt = _evilFeldNachVariante(state, ausgefuehrt, config.evilFeldWahl, feldRng, (r) => feldRng = r);
+      zielWertungVorher = berechneWertung(state, ausgefuehrt.zielSpielerId).punkte;
+    }
+
+    final (neuerState, events) = engine.apply(state, ausgefuehrt);
+    if (zielWertungVorher != null) {
+      final zielId = (ausgefuehrt as EvilSpielen).zielSpielerId;
+      // Bei einer Reaktion (sofort) liegt die Evil-Karte noch nicht — dann
+      // zählt der Schaden erst, wenn sie aufgelöst ist; im Basis-Set gibt es
+      // keine sofort-Karten, die Evil-Karte liegt also direkt.
+      evilEinsaetze++;
+      evilSchadenSumme += zielWertungVorher - berechneWertung(neuerState, zielId).punkte;
+    }
     state = neuerState;
 
     final aktuellesMin = state.spieler.map((s) => s.heiligkeit).reduce(min);
@@ -291,6 +359,8 @@ Partieergebnis spielePartieMitMetriken({
     evilInHandSumme: evilInHandSumme,
     komplettVerstopft: komplettVerstopft,
     erneuerungGespielt: _erneuerungGespielt(gespielteKarten),
+    evilEinsaetze: evilEinsaetze,
+    evilSchadenSumme: evilSchadenSumme,
   );
 }
 
@@ -338,6 +408,8 @@ class SammelErgebnis {
 
   /// Partien, in denen mindestens eine Bauphase komplett verstopft war.
   final int partienMitVerstopfung;
+  final int evilEinsaetze;
+  final int evilSchadenSumme;
 
   const SammelErgebnis({
     required this.anzahlPartien,
@@ -356,7 +428,12 @@ class SammelErgebnis {
     this.komplettVerstopft = 0,
     this.erneuerungGespielt = 0,
     this.partienMitVerstopfung = 0,
+    this.evilEinsaetze = 0,
+    this.evilSchadenSumme = 0,
   });
+
+  /// Ø Punkte, die eine Evil-Karte dem Ziel direkt kostet (D1).
+  double get evilSchadenSchnitt => evilEinsaetze == 0 ? 0 : evilSchadenSumme / evilEinsaetze;
 
   /// Ø Evil-Karten in der Hand zu Beginn einer Bauphase (Hand max. 5).
   double get evilInHandSchnitt => bauphasen == 0 ? 0 : evilInHandSumme / bauphasen;
@@ -430,6 +507,8 @@ SammelErgebnis simuliere({
   var komplettVerstopft = 0;
   var erneuerungGespielt = 0;
   var partienMitVerstopfung = 0;
+  var evilEinsaetze = 0;
+  var evilSchadenSumme = 0;
 
   for (var i = 0; i < anzahlPartien; i++) {
     final seed = startSeed + i * 10;
@@ -449,6 +528,8 @@ SammelErgebnis simuliere({
     komplettVerstopft += ergebnis.komplettVerstopft;
     erneuerungGespielt += ergebnis.erneuerungGespielt;
     if (ergebnis.komplettVerstopft > 0) partienMitVerstopfung++;
+    evilEinsaetze += ergebnis.evilEinsaetze;
+    evilSchadenSumme += ergebnis.evilSchadenSumme;
     for (final e in ergebnis.gespielteKarten.entries) {
       gespielteKartenGesamt.update(e.key, (v) => v + e.value, ifAbsent: () => e.value);
     }
@@ -477,6 +558,8 @@ SammelErgebnis simuliere({
     komplettVerstopft: komplettVerstopft,
     erneuerungGespielt: erneuerungGespielt,
     partienMitVerstopfung: partienMitVerstopfung,
+    evilEinsaetze: evilEinsaetze,
+    evilSchadenSumme: evilSchadenSumme,
     zuege: zuege,
     tiefpunkte: tiefpunkte,
     startspielerSiege: startspielerSiege,

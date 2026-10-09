@@ -25,6 +25,7 @@ void main(List<String> arguments) {
   var erneuerungKopien = 0;
   var erneuerungMenge = 2;
   var umordnungKopien = 0;
+  var evilFeld = EvilFeldWahl.angreifer;
 
   for (var i = 0; i < arguments.length; i++) {
     switch (arguments[i]) {
@@ -48,6 +49,8 @@ void main(List<String> arguments) {
         erneuerungMenge = int.parse(arguments[++i]);
       case '--umordnung':
         umordnungKopien = int.parse(arguments[++i]);
+      case '--evil-feld':
+        evilFeld = EvilFeldWahl.values.byName(arguments[++i]);
     }
   }
 
@@ -60,6 +63,7 @@ void main(List<String> arguments) {
     erneuerungKopien: erneuerungKopien,
     erneuerungMenge: erneuerungMenge,
     umordnungKopien: umordnungKopien,
+    evilFeldWahl: evilFeld,
   );
 
   final ergebnis = simuliere(
@@ -75,7 +79,8 @@ void main(List<String> arguments) {
       'Evil ${mitEvil ? "an" : "aus"}, '
       'D5 (Startspieler 4 Karten) ${startspielerVier ? "an" : "aus"}, '
       'erneuerung: ${erneuerungKopien}x je Deck (menge $erneuerungMenge), '
-      'umordnung: ${umordnungKopien}x je Deck');
+      'umordnung: ${umordnungKopien}x je Deck, '
+      'Evil-Feld wählt: ${evilFeld.name}');
   print('Kartenpool: ${kartenset.alleKarten.length} Karten (Set ${kartenset.set})');
   print('');
   print('Beendet: ${ergebnis.beendet}/${ergebnis.anzahlPartien}'
@@ -86,6 +91,8 @@ void main(List<String> arguments) {
   print('Startspieler-Winrate: ${(ergebnis.startspielerWinrate * 100).toStringAsFixed(1)}%'
       ' (Zielwert 48-52%)');
   print('Tiefpunkt Heiligkeit (Minimum über alle Partien): ${ergebnis.minTiefpunkt}');
+  print('Evil-Schaden je Einsatz (Wertung des Ziels vorher − nachher): '
+      'Ø ${ergebnis.evilSchadenSchnitt.toStringAsFixed(2)} (${ergebnis.evilEinsaetze} Einsätze)');
   print('');
   print('Evil-Handverstopfung (D6):');
   print('  Ø Evil-Karten in der Hand je Bauphase: '

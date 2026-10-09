@@ -70,7 +70,8 @@ spielbar; alle Regelwerk-Tests grün.
      `anzahlImDeckMax: 1` bestätigt. Partie wird etwas kürzer. Siehe
      docs/SIMULATION_PHASE1B.md, Nachtrag 2026-10-09
 3. Regelvarianten (D1, D5, D6) im A/B-Vergleich → **Entscheidungen fixieren,
-   REGELWERK auf v1.0 heben.**
+   REGELWERK auf v1.0 heben.** — **erledigt 2026-10-09:** D1 („Angreifer
+   wählt") gemessen und bestätigt, D5 und D6 siehe oben, REGELWERK ist v1.0.
 4. Kartenwerte im Spreadsheet nachjustieren, `sheet_import`-Pipeline bauen,
    volles Basis-Set importieren.
 5. Playtests mit echten Menschen (Gemeinde/Jugendgruppe) — Simulation findet

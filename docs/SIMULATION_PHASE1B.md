@@ -297,6 +297,30 @@ beschrieben, nicht geprüft). Eigene Evil-Karten dürfen versetzt werden, so
 wie der Bot es in dieser Messung schon getan hat; die Messwerte gelten also
 unverändert.
 
+## Nachtrag 2026-10-09 — D1 im A/B-Vergleich (#6)
+
+**Frage:** REGELWERK D1 legt fest, dass der **Angreifer** wählt, auf welches
+Feld des Ziels eine Evil-Karte kommt. Gemessen war das nie. Varianten:
+Opfer wählt (das Feld, auf dem die Karte am wenigsten schadet) und Zufall.
+
+**Vorgehen:** Testoption `--evil-feld angreifer|opfer|zufall` im Simulator.
+Sie ersetzt nur das vom Bot gewählte Feld; die Engine bleibt unverändert.
+Neue Messgröße: Evil-Schaden je Einsatz = Wertung des Ziels vor minus nach
+dem Ablegen.
+
+Greedy vs. Greedy, n=1000:
+
+| Wer wählt das Feld | Startspieler-Winrate | Evil-Schaden je Einsatz | Partiedauer (Median) | Führungswechsel (Median) |
+|---|---|---|---|---|
+| **Angreifer (D1)** | **53,1 %** (Seed 7: 52,5 %) | **6,25** | 31 | 3 |
+| Zufall | 57,1 % | 5,10 | 26 | 3 |
+| Opfer | 64,7 % (Seed 7: 65,1 %) | 3,92 | 24 | 2 |
+
+**Befund:** Je weniger Evil schadet, desto stärker setzt sich der
+Startspieler durch. Nur „Angreifer wählt“ bremst den Führenden genug, um
+die Startspieler-Winrate nahe am Zielkorridor (48–52 %) zu halten. D1 ist
+damit per Messung bestätigt.
+
 ## Bekannte Grenzen
 
 - **Keine Effektkarten im Bestand** (alle 106 Karten: `effekt: null`) — die
@@ -324,6 +348,7 @@ dart run bin/simulator.dart --spiele 300 --seed 1 --bot1 greedy --bot2 greedy --
 dart run bin/simulator.dart --spiele 500 --bot1 defensiv --bot2 defensiv --erneuerung 2  # D6
 dart run bin/effektwert.dart --effekt umordnung --spiele 1000                          # #5
 dart run bin/simulator.dart --spiele 1000 --umordnung 1                                 # #5
+dart run bin/simulator.dart --spiele 1000 --evil-feld opfer                             # D1: angreifer|opfer|zufall
 # --bot1/--bot2: greedy | zufall | defensiv | anfuehrer
 
 dart run bin/spezialisierung.dart --spiele 300 --seed 1
