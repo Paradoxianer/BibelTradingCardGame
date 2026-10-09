@@ -35,4 +35,35 @@ void main() {
     expect(wahl.handKartenIds, hasLength(2), reason: 'menge 2 begrenzt die Auswahl');
     expect(wahl.handKartenIds, everyElement(startsWith('e')), reason: 'nur Evil-Karten');
   });
+
+  test('GreedyBot nutzt umordnung, um eine wertvolle Karte unter ein Loch zu schieben', () {
+    final loch = testKarte('loch', ['x', 'x', 'x', 'x', 'x', 'x']);
+    final null0 = testKarte('null', ['0', '0', '0', '0', '0', '0']);
+    final zwei = testKarte('zwei', ['2', '2', '2', '2', '2', '2']);
+    final umordnung = testKarte(
+      'umo',
+      ['0', '0', '0', '0', '0', '0'],
+      effekt: const Umordnung(UmordnungZiel.eigen),
+    );
+    // Feld 0: Loch oben, darunter die Null-Karte — die 2er liegt verdeckt
+    // ganz unten. Eine Verschiebung bringt sie direkt unter das Loch.
+    final state = testState([
+      testSpieler(
+        'p1',
+        hand: [umordnung],
+        spielfelder: [testFeld([loch, null0, zwei]), const Spielfeld(), const Spielfeld()],
+      ),
+      testSpieler('p2'),
+    ]);
+    final vorher = berechneWertung(state, 'p1').punkte;
+
+    final (command, _) = const GreedyBot().waehleCommand(state, 'p1', SeedableRng.seeded(1));
+    expect(command, isA<KarteBauen>());
+    expect((command as KarteBauen).effektWahl, isA<UmordnungWahl>());
+
+    final (nachher, _) = GameEngine().apply(state, command);
+    final feld0 = nachher.spielerMitId('p1').spielfelder[0].stapel.map((l) => l.karte.id).toList();
+    expect(feld0.indexOf('zwei'), 1, reason: 'die 2er liegt jetzt direkt unter dem Loch');
+    expect(berechneWertung(nachher, 'p1').punkte, greaterThan(vorher));
+  });
 }

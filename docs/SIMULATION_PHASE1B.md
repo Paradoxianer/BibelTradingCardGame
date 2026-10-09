@@ -236,13 +236,76 @@ ein sinnvolles, ungefährliches Komfort-Ventil für zurückhaltende Spieler,
 aber keine Notwendigkeit. Grenzen: nur 2 Spieler, nur Bots. Ob Menschen
 Evil öfter zurückhalten als `DefensivBot`, zeigen erst Playtests (#7).
 
+## Nachtrag 2026-10-09 — `umordnung` gesondert bewertet (#5)
+
+**Frage:** Wie stark ist `umordnung` (eigene Variante, EFFEKTE §2.8 — eine
+Karte im eigenen Stapel versetzen)? Die Wirkung galt als schwer abschätzbar,
+weil eine Verschiebung mehrere Slot-Spalten gleichzeitig drehen kann.
+
+**Vorgehen:** Wie bei D6 trägt keine Karte im Basis-Set diesen Effekt. Neu
+ist `bin/effektwert.dart`: eine gepaarte Messung, bei der dieselbe Karte
+einmal ohne und einmal mit Effekt im Deck liegt (gleiche Slots, gleiche
+Deckposition, gleiche Seeds) — gemessen wird also nur der Effekt selbst,
+nicht die Karte. `GreedyBot` probiert beim Bauen einer `umordnung`-Karte
+jede Verschiebung in jedem eigenen Stapel durch und nimmt die beste. Die
+Startkarte bleibt dabei samt Position unberührt (siehe offene Frage unten).
+Zusätzlich lässt sich mit `bin/simulator.dart --umordnung N` die Karte in
+beide Decks einmischen.
+
+**Ergebnis gepaarte Messung** (Greedy vs. Greedy, eine Karte im Deck,
+1000 Paare Seed 42 / 2000 Paare Seed 7):
+
+| Messgröße | Seed 42 | Seed 7 |
+|---|---|---|
+| Karte gezogen und gespielt | 68 % der Partien | 70 % |
+| davon Wertung tatsächlich verändert | 87 % | 84 % |
+| Sofort-Gewinn je Einsatz | Ø 3,6 Punkte, max 13 | Ø 3,6, max 13 |
+| Δ Heiligkeit am Partieende | +2,7 (σ 8,8) | +2,7 (σ 8,6) |
+| Δ Siegquote | +6,0 Prozentpunkte | +5,5 Prozentpunkte |
+| Δ Partiedauer | −0,8 Züge | −0,8 Züge |
+
+Der Sofort-Gewinn wird jede weitere Runde erneut gewertet, solange die
+Auslage so bleibt (REGELWERK §6: das Board ist ein wiederkehrender Motor).
+
+**Einordnung:** Der Effekt allein ist ungefähr so viel wert wie der
+Unterschied zwischen einer durchschnittlichen und einer der stärksten
+Ressourcenkarten (docs/KARTENSTAERKE.md: stärkste Karte +5,1, dritt­
+stärkste +2,7 Heiligkeit — dort allerdings nur 30 Stichproben je Karte).
+Stark, aber nicht spielbrechend. Das bestätigt die Design-Vorgabe aus
+EFFEKTE §2.8: `anzahlImDeckMax: 1`.
+
+**Beide Spieler mit `umordnung`** (Greedy vs. Greedy, n=1000):
+
+| umordnung je Deck | Partiedauer (Median) | Startspieler-Winrate | Führungswechsel (Median) | Schwankung je Zug |
+|---|---|---|---|---|
+| 0 | 31 | 53,1 % | 3 | 4,66 |
+| 1 | 29 | 53,6 % | 3 | 4,72 |
+| 3 | 27 | 51,4 % | 3 | 4,80 |
+
+Die Partie wird kürzer (mehr Punkte je Zug), Startspieler-Vorteil und
+Spannung bleiben gleich, die Wertung schwankt minimal stärker.
+
+**Nebenbefund `erneuerung`:** In derselben gepaarten Messung ist
+`erneuerung` (Bot mischt nur Evil-Karten zurück) leicht nachteilig:
+Δ Heiligkeit −1,2, Δ Siegquote −3,1 Prozentpunkte. Zurückgemischte
+Evil-Karten werden später wieder gezogen. Passt zur D6-Entscheidung,
+dass die Karte nicht nötig ist.
+
+**Offen (Regelfrage, nicht entschieden):** EFFEKTE §2.8 sagt „Startkarte
+ist ausgenommen“, die Engine prüft das aber nicht — `umordnung` kann dort
+die Startkarte verschieben. Der Bot lässt sie in dieser Messung samt
+Position unberührt. Ebenfalls unklar: ob eigene Evil-Karten verschoben
+werden dürfen (der Bot darf es hier, z. B. um eine Evil-Karte tiefer zu
+legen).
+
 ## Bekannte Grenzen
 
 - **Keine Effektkarten im Bestand** (alle 106 Karten: `effekt: null`) — die
   Effekt-Resolver der Engine sind getestet, aber diese Simulation sagt
   nichts über `umkehrung`, `schutz`, `suche` usw. aus, weil keine Karte sie
   trägt. Ausnahme: `erneuerung` wurde für D6 per Testoption künstlich
-  eingemischt (siehe Nachtrag 2026-10-08).
+  eingemischt (siehe Nachtrag 2026-10-08), ebenso `umordnung` für #5
+  (Nachtrag 2026-10-09).
 - **Keine `sofort`-Karten im Bestand** — die Reaktion-Phase kommt in dieser
   Simulation nie zum Einsatz.
 - Bot-Heuristiken sind Näherungen, keine optimalen Spieler — absolute Zahlen
@@ -260,6 +323,8 @@ dart run bin/simulator.dart --spiele 300 --seed 1 --bot1 greedy --bot2 greedy
 dart run bin/simulator.dart --spiele 300 --seed 1 --bot1 greedy --bot2 greedy --ohne-evil
 dart run bin/simulator.dart --spiele 300 --seed 1 --bot1 greedy --bot2 greedy --startspieler-vier
 dart run bin/simulator.dart --spiele 500 --bot1 defensiv --bot2 defensiv --erneuerung 2  # D6
+dart run bin/effektwert.dart --effekt umordnung --spiele 1000                          # #5
+dart run bin/simulator.dart --spiele 1000 --umordnung 1                                 # #5
 # --bot1/--bot2: greedy | zufall | defensiv | anfuehrer
 
 dart run bin/spezialisierung.dart --spiele 300 --seed 1

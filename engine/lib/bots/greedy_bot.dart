@@ -59,11 +59,51 @@ class GreedyBot implements Bot {
         final neueFelder = List<Spielfeld>.of(spieler.spielfelder);
         neueFelder[i] = neueFelder[i].legeObenauf(karte);
         final kandidat = spieler.copyWith(spielfelder: neueFelder);
+        if (karte.effekt is Umordnung) {
+          final (umordnung, wert) = _besteUmordnung(state, kandidat, i);
+          betrachte(KarteBauen(feldIndex: i, karteId: karte.id, effektWahl: umordnung), wert);
+          continue;
+        }
         final wert = berechneWertung(state.mitSpieler(kandidat), spielerId).punkte;
         betrachte(KarteBauen(feldIndex: i, karteId: karte.id, effektWahl: wahl), wert);
       }
     }
     return bester ?? const Passen();
+  }
+
+  /// `umordnung` (EFFEKTE §2.8, eigene Variante): probiert jede Verschiebung
+  /// einer Karte innerhalb eines eigenen Stapels durch — nachdem die
+  /// Effektkarte selbst schon auf Feld [gebautAuf] liegt — und nimmt die mit
+  /// der besten Wertung. Die Startkarte bleibt unberührt, samt ihrer
+  /// Position: verschoben wird nur oberhalb von ihr (EFFEKTE §2.8 "Startkarte
+  /// ist ausgenommen"; die Engine prüft das bisher nicht).
+  (UmordnungWahl, int) _besteUmordnung(GameState state, Spieler nachBau, int gebautAuf) {
+    // Kein Gewinn möglich: dann eine erlaubte Nicht-Verschiebung.
+    var beste = UmordnungWahl(feldIndex: gebautAuf, vonTiefe: 0, nachTiefe: 0);
+    var besterWert = berechneWertung(state.mitSpieler(nachBau), nachBau.id).punkte;
+    for (var f = 0; f < nachBau.spielfelder.length; f++) {
+      final stapel = nachBau.spielfelder[f].stapel;
+      final startIndex = stapel.indexWhere((l) => l.karte.kategorie == Kategorie.start);
+      final grenze = startIndex == -1 ? stapel.length : startIndex;
+      for (var von = 0; von < grenze; von++) {
+        for (var nach = 0; nach < grenze; nach++) {
+          if (von == nach) continue;
+          final neu = List<Kartenlage>.of(stapel);
+          neu.insert(nach, neu.removeAt(von));
+          final felder = List<Spielfeld>.of(nachBau.spielfelder);
+          felder[f] = Spielfeld(neu);
+          final wert = berechneWertung(
+            state.mitSpieler(nachBau.copyWith(spielfelder: felder)),
+            nachBau.id,
+          ).punkte;
+          if (wert > besterWert) {
+            besterWert = wert;
+            beste = UmordnungWahl(feldIndex: f, vonTiefe: von, nachTiefe: nach);
+          }
+        }
+      }
+    }
+    return (beste, besterWert);
   }
 
   /// `erneuerung` (EFFEKTE §2.7) ist als Ventil gegen Evil-Handverstopfung

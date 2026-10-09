@@ -3,6 +3,8 @@ import 'dart:math';
 import 'package:btcg_engine/bots/bots.dart';
 import 'package:btcg_engine/engine.dart';
 
+import 'effektwert.dart';
+
 /// Ob Evil überhaupt gespielt werden darf (REGELWERK §7 Baseline-Messung
 /// vergleicht "mit Evil" gegen "ohne Evil" bei sonst identischem Deck).
 class SimulatorConfig {
@@ -17,35 +19,28 @@ class SimulatorConfig {
   final int erneuerungKopien;
   final int erneuerungMenge;
 
+  /// #5-Experiment, gleiches Prinzip: so viele Karten je Deck tragen
+  /// testweise `umordnung` (eigene Variante, EFFEKTE §2.8).
+  final int umordnungKopien;
+
   const SimulatorConfig({
     this.mitEvil = true,
     this.startspielerZiehtNurVier = false,
     this.erneuerungKopien = 0,
     this.erneuerungMenge = 2,
+    this.umordnungKopien = 0,
   });
 }
 
-/// Kennzeichnet testweise mit `erneuerung` versehene Karten (eigene ID,
+/// Kennzeichnen testweise mit einem Effekt versehene Karten (eigene ID,
 /// sonst wären sie per `==` nicht vom Original zu unterscheiden).
 const kErneuerungSuffix = '-ERN';
+const kUmordnungSuffix = '-UMO';
 
-Karte _mitErneuerung(Karte k, int menge) => Karte(
-  id: '${k.id}$kErneuerungSuffix',
-  cardId: k.cardId,
-  name: k.name,
-  vers: k.vers,
-  slots: k.slots,
-  kategorie: k.kategorie,
-  seltenheit: k.seltenheit,
-  sofort: k.sofort,
-  effekt: Erneuerung(menge),
-  anzahlImDeckMax: k.anzahlImDeckMax,
-  pictureLink: k.pictureLink,
-);
-
-/// Ersetzt die ersten [kopien] Ressourcenkarten des (bereits gemischten)
-/// Decks — also zufällig gewählte — durch ihre `erneuerung`-Variante.
-SpielerAufbau _mitErneuerungsKarten(SpielerAufbau aufbau, int kopien, int menge) {
+/// Ersetzt die ersten [kopien] noch effektlosen Ressourcenkarten des
+/// (bereits gemischten) Decks — also zufällig gewählte — durch ihre Variante
+/// mit [effekt]. Slots und Kategorie bleiben gleich.
+SpielerAufbau _mitEffektKarten(SpielerAufbau aufbau, int kopien, Effekt effekt, String suffix) {
   if (kopien <= 0) return aufbau;
   var rest = kopien;
   final deck = [
@@ -53,7 +48,7 @@ SpielerAufbau _mitErneuerungsKarten(SpielerAufbau aufbau, int kopien, int menge)
       if (rest > 0 && k.kategorie != Kategorie.evil && k.effekt == null)
         () {
           rest--;
-          return _mitErneuerung(k, menge);
+          return karteMitEffekt(k, effekt, suffix: suffix);
         }()
       else
         k,
@@ -146,10 +141,16 @@ Partieergebnis spielePartieMitMetriken({
 }) {
   final aufbau = [
     for (final (id, s) in [('p1', seed), ('p2', seed + 1)])
-      _mitErneuerungsKarten(
-        _baueDeck(id: id, kartenpool: kartenpool, seed: s, mitEvil: config.mitEvil),
-        config.erneuerungKopien,
-        config.erneuerungMenge,
+      _mitEffektKarten(
+        _mitEffektKarten(
+          _baueDeck(id: id, kartenpool: kartenpool, seed: s, mitEvil: config.mitEvil),
+          config.erneuerungKopien,
+          Erneuerung(config.erneuerungMenge),
+          kErneuerungSuffix,
+        ),
+        config.umordnungKopien,
+        const Umordnung(UmordnungZiel.eigen),
+        kUmordnungSuffix,
       ),
   ];
   var state = neuesSpiel(

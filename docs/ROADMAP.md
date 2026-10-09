@@ -64,7 +64,11 @@ spielbar; alle Regelwerk-Tests grün.
      Bauphasen), auch ohne Ventil; `erneuerung` lindert nur die teilweise
      Verstopfung zurückhaltender Spieler um 15–22 %, ohne die Partie zu
      verlängern. Siehe docs/SIMULATION_PHASE1B.md, Nachtrag 2026-10-08
-   - `umordnung` gesondert bewerten (schwer abschätzbarer Effekt)
+   - `umordnung` gesondert bewerten (schwer abschätzbarer Effekt) —
+     **gemessen:** Effekt allein +2,7 Heiligkeit bzw. +5,5–6 Prozentpunkte
+     Siegquote, Ø 3,6 Punkte je Einsatz; stark, aber nicht spielbrechend —
+     `anzahlImDeckMax: 1` bestätigt. Partie wird etwas kürzer. Siehe
+     docs/SIMULATION_PHASE1B.md, Nachtrag 2026-10-09
 3. Regelvarianten (D1, D5, D6) im A/B-Vergleich → **Entscheidungen fixieren,
    REGELWERK auf v1.0 heben.**
 4. Kartenwerte im Spreadsheet nachjustieren, `sheet_import`-Pipeline bauen,

@@ -24,6 +24,7 @@ void main(List<String> arguments) {
   var inputPfad = '../../data/sets/base.json';
   var erneuerungKopien = 0;
   var erneuerungMenge = 2;
+  var umordnungKopien = 0;
 
   for (var i = 0; i < arguments.length; i++) {
     switch (arguments[i]) {
@@ -45,6 +46,8 @@ void main(List<String> arguments) {
         erneuerungKopien = int.parse(arguments[++i]);
       case '--erneuerung-menge':
         erneuerungMenge = int.parse(arguments[++i]);
+      case '--umordnung':
+        umordnungKopien = int.parse(arguments[++i]);
     }
   }
 
@@ -56,6 +59,7 @@ void main(List<String> arguments) {
     startspielerZiehtNurVier: startspielerVier,
     erneuerungKopien: erneuerungKopien,
     erneuerungMenge: erneuerungMenge,
+    umordnungKopien: umordnungKopien,
   );
 
   final ergebnis = simuliere(
@@ -70,7 +74,8 @@ void main(List<String> arguments) {
   print('Simulation: $spiele Partien, $bot1 vs. $bot2, '
       'Evil ${mitEvil ? "an" : "aus"}, '
       'D5 (Startspieler 4 Karten) ${startspielerVier ? "an" : "aus"}, '
-      'erneuerung: ${erneuerungKopien}x je Deck (menge $erneuerungMenge)');
+      'erneuerung: ${erneuerungKopien}x je Deck (menge $erneuerungMenge), '
+      'umordnung: ${umordnungKopien}x je Deck');
   print('Kartenpool: ${kartenset.alleKarten.length} Karten (Set ${kartenset.set})');
   print('');
   print('Beendet: ${ergebnis.beendet}/${ergebnis.anzahlPartien}'
