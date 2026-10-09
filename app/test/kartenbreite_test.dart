@@ -48,52 +48,77 @@ GameBloc _bloc(Kartenset kartenset) => GameBloc(
 void main() {
   setUp(() => HydratedBloc.storage = SpeicherImArbeitsspeicher());
 
-  group('kartenDarstellungFuerBildschirm', () {
-    test('bleibt unter der Schwelle bei der bisherigen kompakten Ansicht', () {
-      final schmal = kartenDarstellungFuerBildschirm(700);
-      expect(schmal.ansicht, KartenAnsicht.kompakt);
-      expect(schmal.breite, 120);
+  group('kartenDarstellungFuer', () {
+    test('Hochformat (Handy): kompakte Mini-Karten', () {
+      expect(kartenDarstellungFuer(const Size(390, 720)).ansicht, KartenAnsicht.kompakt);
     });
 
-    test('wechselt ab der Schwelle direkt auf die volle Kartenansicht', () {
-      final breit = kartenDarstellungFuerBildschirm(1600);
-      expect(breit.ansicht, KartenAnsicht.voll);
-      expect(breit.breite, 320);
+    test('Querformat (Desktop): volle Karten', () {
+      expect(kartenDarstellungFuer(const Size(1920, 834)).ansicht, KartenAnsicht.voll);
+    });
+
+    test('Karten skalieren mit der Fläche', () {
+      final klein = kartenDarstellungFuer(const Size(1920, 834));
+      final gross = kartenDarstellungFuer(const Size(2560, 1300));
+      expect(gross.breite, greaterThan(klein.breite));
+
+      final handyKlein = kartenDarstellungFuer(const Size(360, 640));
+      final handyGross = kartenDarstellungFuer(const Size(430, 860));
+      expect(handyGross.breite, greaterThan(handyKlein.breite));
+    });
+
+    test('drei Kartenreihen passen in die Höhe', () {
+      const flaeche = Size(1920, 834);
+      final d = kartenDarstellungFuer(flaeche);
+      expect(3 * KartenWidget.hoeheFuer(d.breite, d.ansicht), lessThan(flaeche.height));
+    });
+
+    test('ein viertes Feld (Gebietserweiterung) verkleinert die Karten in der Breite', () {
+      const flaeche = Size(400, 800);
+      expect(
+        kartenDarstellungFuer(flaeche, felder: 4).breite,
+        lessThan(kartenDarstellungFuer(flaeche).breite),
+      );
+    });
+
+    test('Großansicht per Doppeltipp lohnt nur, solange die Karte kleiner ist', () {
+      expect(grossansichtLohnt(KartenAnsicht.kompakt, 400), isTrue);
+      expect(grossansichtLohnt(KartenAnsicht.voll, 150), isTrue);
+      expect(grossansichtLohnt(KartenAnsicht.voll, kGrossansichtBreite), isFalse);
     });
   });
 
-  testWidgets(
-    'Feldkarten zeigen auf einem breiten Bildschirm die volle Ansicht mit Bibeltext',
-    (tester) async {
+  for (final (groesse, erwartet) in [
+    (const Size(1920, 953), KartenAnsicht.voll), // Fenster, in dem die Hand verschwand
+    (const Size(2560, 1440), KartenAnsicht.voll),
+    (const Size(400, 850), KartenAnsicht.kompakt), // Handy hochkant
+  ]) {
+    testWidgets('Regression: auf ${groesse.width.toInt()}×${groesse.height.toInt()} passt das ganze Brett '
+        'samt eigener Hand ohne Scrollen (${erwartet.name})', (tester) async {
       addTearDown(tester.view.reset);
+      tester.view.physicalSize = groesse;
+      tester.view.devicePixelRatio = 1.0;
       final bloc = _bloc(_kartenset());
       addTearDown(bloc.close);
+      await tester.pumpWidget(
+        MaterialApp(home: BlocProvider.value(value: bloc, child: SpielScreen(onNeuesSpiel: () {}))),
+      );
+      await tester.pump();
 
-      Future<KartenWidget> ersteFeldkarte(Size groesse) async {
-        tester.view.physicalSize = groesse;
-        tester.view.devicePixelRatio = 1.0;
-        await tester.pumpWidget(
-          MaterialApp(
-            home: BlocProvider.value(value: bloc, child: SpielScreen(onNeuesSpiel: () {})),
-          ),
-        );
-        await tester.pump();
-        final karte = find
-            .descendant(
-              of: find.byKey(const ValueKey('eigenes-feld-0')),
-              matching: find.byType(KartenWidget),
-            )
-            .first;
-        return tester.widget<KartenWidget>(karte);
-      }
+      final feldkarte = tester.widget<KartenWidget>(
+        find
+            .descendant(of: find.byKey(const ValueKey('eigenes-feld-0')), matching: find.byType(KartenWidget))
+            .first,
+      );
+      expect(feldkarte.ansicht, erwartet);
 
-      final schmal = await ersteFeldkarte(const Size(700, 1400));
-      expect(schmal.ansicht, KartenAnsicht.kompakt);
-      expect(schmal.breite, 120);
-
-      final breit = await ersteFeldkarte(const Size(1600, 1400));
-      expect(breit.ansicht, KartenAnsicht.voll);
-      expect(breit.breite, 320);
-    },
-  );
+      final brett = find.byWidgetPredicate(
+        (w) => w is SingleChildScrollView && w.scrollDirection == Axis.vertical,
+      );
+      final scrollable = tester.state<ScrollableState>(
+        find.descendant(of: brett, matching: find.byType(Scrollable)).first,
+      );
+      expect(scrollable.position.maxScrollExtent, 0, reason: 'nichts darf unter den Rand rutschen');
+    });
+  }
 }

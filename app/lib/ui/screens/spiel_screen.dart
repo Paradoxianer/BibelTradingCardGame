@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:btcg_engine/engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -26,16 +28,40 @@ const BoxDecoration _bretthintergrund = BoxDecoration(
   ),
 );
 
-/// Nur zwei Zustände, keine Zwischengrößen (keep it simple): auf schmalen
-/// (Handy-)Bildschirmen die bisherige kompakte Darstellung, auf breiten
-/// (Tablet/Desktop-)Bildschirmen direkt dieselbe Vollansicht wie in der
-/// Großansicht per Doppeltipp — echte Kartengröße mit Bibeltext, statt nur
-/// einer größer skalierten kompakten Karte (Issue #8).
-({KartenAnsicht ansicht, double breite}) kartenDarstellungFuerBildschirm(
-  double bildschirmBreite,
-) => bildschirmBreite >= 1200
-    ? (ansicht: KartenAnsicht.voll, breite: 320.0)
-    : (ansicht: KartenAnsicht.kompakt, breite: 120.0);
+/// Platz im Spielbrett, den nicht die Karten in Feldern und eigener Hand
+/// belegen: Kopfzeilen, Abstände, Rahmen und Punkteanzeigen beider Bereiche
+/// plus die verdeckte (bewusst kleine) Gegnerhand — bzw. in der Breite
+/// Ziehstapel und Ränder. Je Feld kommen 8px Abstand und 10px Auswahlrahmen
+/// samt Innenabstand dazu (siehe [_AntippbaresFeld]).
+const double _kNebenflaecheHoehe = 260;
+const double _kNebenflaecheBreite = 140;
+const double _kFeldAbstand = 18;
+
+/// Untergrenze, damit die Karten auch auf sehr kleinen Flächen nicht ins
+/// Unkenntliche schrumpfen (dann wird eben gescrollt).
+const double _kMindestbreite = 60;
+
+/// Breite der Großansicht per Doppeltipp.
+const double kGrossansichtBreite = 320;
+
+/// Hochformat (Handy) → kompakte Mini-Karten, Querformat (Desktop/Tablet
+/// quer) → volle Karten mit Bibeltext (Issue #8). In beiden Fällen skaliert
+/// die Karte mit der tatsächlich verfügbaren [flaeche] des Spielbretts:
+/// übereinander liegen drei Reihen (Gegnerfelder, eigene Felder, eigene
+/// Hand), nebeneinander [felder] Felder plus Ziehstapel — die Karte wird so
+/// groß, dass beides ohne Scrollen hineinpasst.
+({KartenAnsicht ansicht, double breite}) kartenDarstellungFuer(Size flaeche, {int felder = 3}) {
+  final ansicht = flaeche.width > flaeche.height ? KartenAnsicht.voll : KartenAnsicht.kompakt;
+  final ausHoehe = (flaeche.height - _kNebenflaecheHoehe) / (3 * KartenWidget.hoeheFuer(1, ansicht));
+  final ausBreite = (flaeche.width - _kNebenflaecheBreite) / felder - _kFeldAbstand;
+  final breite = max(_kMindestbreite, min(ausHoehe, ausBreite));
+  return (ansicht: ansicht, breite: breite.floorToDouble());
+}
+
+/// Ob die Großansicht per Doppeltipp mehr zeigt als die Karte auf dem Brett
+/// schon tut — nur bei voller Ansicht in mindestens Großansicht-Breite nicht.
+bool grossansichtLohnt(KartenAnsicht ansicht, double breite) =>
+    ansicht != KartenAnsicht.voll || breite < kGrossansichtBreite;
 
 class SpielScreen extends StatelessWidget {
   final VoidCallback onNeuesSpiel;
@@ -71,7 +97,6 @@ class _SpielBrett extends StatelessWidget {
   Widget build(BuildContext context) {
     final spiel = state.spiel;
     final aktiver = spiel.aktiverSpieler;
-    final darstellung = kartenDarstellungFuerBildschirm(MediaQuery.sizeOf(context).width);
 
     return Scaffold(
       appBar: AppBar(title: Text(_phaseName(spiel.phase))),
@@ -90,30 +115,39 @@ class _SpielBrett extends StatelessWidget {
                 ),
               ),
             Expanded(
-              child: SingleChildScrollView(
-                // Alle Spieler in derselben Darstellung — der eigene Bereich
-                // ist kein Sonderfall, nur die Rechte unterscheiden sich.
-                child: Column(
-                  children: [
-                    // Man sitzt sich gegenüber: die Mitspieler oben, der
-                    // eigene Bereich unten vor einem.
-                    for (final s in spiel.spieler.where((s) => s.id != aktiver.id))
-                      _Bereich(
-                        spieler: s,
-                        state: state,
-                        eigen: false,
-                        ansicht: darstellung.ansicht,
-                        feldBreite: darstellung.breite,
-                      ),
-                    _Bereich(
-                      spieler: aktiver,
-                      state: state,
-                      eigen: true,
-                      ansicht: darstellung.ansicht,
-                      feldBreite: darstellung.breite,
+              child: LayoutBuilder(
+                builder: (context, flaeche) {
+                  final darstellung = kartenDarstellungFuer(
+                    flaeche.biggest,
+                    felder: spiel.spieler.map((s) => s.spielfelder.length).reduce(max),
+                  );
+                  return SingleChildScrollView(
+                    // Alle Spieler in derselben Darstellung — der eigene
+                    // Bereich ist kein Sonderfall, nur die Rechte
+                    // unterscheiden sich.
+                    child: Column(
+                      children: [
+                        // Man sitzt sich gegenüber: die Mitspieler oben, der
+                        // eigene Bereich unten vor einem.
+                        for (final s in spiel.spieler.where((s) => s.id != aktiver.id))
+                          _Bereich(
+                            spieler: s,
+                            state: state,
+                            eigen: false,
+                            ansicht: darstellung.ansicht,
+                            feldBreite: darstellung.breite,
+                          ),
+                        _Bereich(
+                          spieler: aktiver,
+                          state: state,
+                          eigen: true,
+                          ansicht: darstellung.ansicht,
+                          feldBreite: darstellung.breite,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
             if (spiel.phase == ZugPhase.reaktion)
@@ -242,9 +276,7 @@ class _AntippbaresFeld extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final jetzt = werteFeld(feld, 0).punkte;
-    // Bei ansicht == voll zeigt das Feld Bibeltext & Co. schon direkt an —
-    // die Großansicht-Dialog wäre dann nur eine identische Kopie.
-    final grossansichtNoetig = !feld.istLeer && ansicht != KartenAnsicht.voll;
+    final grossansichtNoetig = !feld.istLeer && grossansichtLohnt(ansicht, breite);
     return GestureDetector(
       onTap: onTap,
       onDoubleTap: grossansichtNoetig ? () => zeigeFeldGross(context, feld) : null,
@@ -347,9 +379,7 @@ class _AntippbareHandkarte extends StatelessWidget {
     opacity: spielbar ? 1.0 : 0.45,
     child: GestureDetector(
       onTap: spielbar ? onTap : null,
-      // Bei ansicht == voll zeigt die Handkarte Bibeltext & Co. schon direkt
-      // an — die Großansicht-Dialog wäre dann nur eine identische Kopie.
-      onDoubleTap: ansicht == KartenAnsicht.voll ? null : () => zeigeKarteGross(context, karte),
+      onDoubleTap: grossansichtLohnt(ansicht, breite) ? () => zeigeKarteGross(context, karte) : null,
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
@@ -377,7 +407,7 @@ void zeigeKarteGross(BuildContext context, Karte karte) {
       child: KartenWidget.handkarte(
         karte,
         ansicht: KartenAnsicht.voll,
-        breite: 320,
+        breite: kGrossansichtBreite,
       ),
     ),
   );
@@ -395,7 +425,7 @@ void zeigeFeldGross(BuildContext context, Spielfeld feld) {
       backgroundColor: Colors.transparent,
       child: StapelWidget(
         feld: feld,
-        breite: 320,
+        breite: kGrossansichtBreite,
         ansicht: KartenAnsicht.voll,
       ),
     ),
