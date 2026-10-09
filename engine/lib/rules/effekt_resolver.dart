@@ -151,6 +151,14 @@ EffektErgebnis resolveSofortEffekt({
           w.nachTiefe >= stapel.length) {
         throw const RegelVerstoss('Ungültige Position für umordnung');
       }
+      // Startkarte ausgenommen (EFFEKTE §2.8): sie selbst bleibt liegen, und
+      // ihre Position ändert sich nicht — versetzt wird nur oberhalb von
+      // ihr. Andere Karten, auch gegen einen gespielte Evil-Karten, dürfen
+      // versetzt werden.
+      final startTiefe = stapel.indexWhere((l) => l.karte.kategorie == Kategorie.start);
+      if (startTiefe != -1 && (w.vonTiefe >= startTiefe || w.nachTiefe >= startTiefe)) {
+        throw const RegelVerstoss('Die Startkarte ist von umordnung ausgenommen');
+      }
       final bewegt = stapel.removeAt(w.vonTiefe);
       stapel.insert(w.nachTiefe, bewegt);
       final neueFelder = List<Spielfeld>.of(spieler.spielfelder);

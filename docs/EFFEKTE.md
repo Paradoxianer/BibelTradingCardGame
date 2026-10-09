@@ -138,12 +138,19 @@ komplett kippen.
   `"eigen"`.
 - `dauer`: `sofort`
 - Design-Hinweise:
-  - Wichtig (Startkarte - ist ausgenommen (Evil))
+  - **Startkarte (EStart) ist ausgenommen:** sie selbst wird nicht versetzt,
+    und ihre Position im Stapel bleibt unverändert — versetzt wird nur
+    oberhalb von ihr. Alle anderen Karten im eigenen Stapel dürfen versetzt
+    werden, **auch gegen dich gespielte Evil-Karten** (z. B. um sie tiefer zu
+    legen). Entschieden 2026-10-09.
   - Dies ist die **einzige sanktionierte Ausnahme** von der eingefrorenen
     Stapel-Reihenfolge (REGELWERK D3-A) — genau der dort erwähnte „seltene
     Karteneffekt". Entsprechend: `anzahlImDeckMax: 1`, hohe Effektkosten.
   - Wirkung ist schwer abschätzbar (eine Verschiebung kann mehrere Slot-Spalten
-    gleichzeitig drehen) → Pflichtkandidat für die Simulation in Phase 1b.
+    gleichzeitig drehen) → in Phase 1b gemessen (docs/SIMULATION_PHASE1B.md,
+    Nachtrag 2026-10-09): Effekt allein +2,7 Heiligkeit bzw. +5,5–6
+    Prozentpunkte Siegquote — stark, aber nicht spielbrechend;
+    `anzahlImDeckMax: 1` bestätigt.
   - Das bloße **Durchschauen** eines Stapels ist bewusst kein Effekt, sondern
     hängt an der offenen Regelfrage D9 (ist Stapelinhalt öffentliche
     Information?). Fällt D9 auf „verdeckt", wird hier ein eigener

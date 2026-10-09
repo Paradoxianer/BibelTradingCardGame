@@ -152,6 +152,70 @@ void main() {
       expect(stapel.map((k) => k.karte.id).toList(), ['umordner', 'unten', 'mitte']);
     });
 
+    group('umordnung: Startkarte ausgenommen, Evil erlaubt (EFFEKTE §2.8)', () {
+      final eStart = testKarte(
+        'estart',
+        ['-1', '-1', '-1', '-1', '-1', '-1'],
+        kategorie: Kategorie.start,
+      );
+      final mitte = testKarte('mitte', ['x', '0', '0', '0', '0', '0']);
+      final umordner = testKarte(
+        'umordner',
+        ['x', '0', '0', '0', '0', '0'],
+        effekt: const Umordnung(UmordnungZiel.eigen),
+      );
+
+      // Nach dem Legen: [umordner, mitte, estart] (Tiefe 0, 1, 2).
+      GameState stateMit(List<Karte> feldObenNachUnten) => testState([
+        testSpieler(
+          'p1',
+          hand: [umordner],
+          spielfelder: [testFeld(feldObenNachUnten), const Spielfeld(), const Spielfeld()],
+        ),
+        testSpieler('p2'),
+      ]).copyWith(rundeNummer: 2);
+
+      KarteBauen bauen(int von, int nach) => KarteBauen(
+        feldIndex: 0,
+        karteId: 'umordner',
+        effektWahl: UmordnungWahl(feldIndex: 0, vonTiefe: von, nachTiefe: nach),
+      );
+
+      test('die Startkarte selbst darf nicht versetzt werden', () {
+        expect(
+          () => engine.apply(stateMit([mitte, eStart]), bauen(2, 0)),
+          throwsA(isA<RegelVerstoss>()),
+        );
+      });
+
+      test('keine Karte darf unter die Startkarte geschoben werden', () {
+        expect(
+          () => engine.apply(stateMit([mitte, eStart]), bauen(0, 2)),
+          throwsA(isA<RegelVerstoss>()),
+        );
+      });
+
+      test('oberhalb der Startkarte ist Versetzen erlaubt', () {
+        final (neu, _) = engine.apply(stateMit([mitte, eStart]), bauen(1, 0));
+        final stapel = neu.spielerMitId('p1').spielfelder[0].stapel;
+        expect(stapel.map((l) => l.karte.id).toList(), ['mitte', 'umordner', 'estart']);
+      });
+
+      test('eine gegen einen gespielte Evil-Karte darf tiefer gelegt werden', () {
+        final evil = testKarte(
+          'evil',
+          ['-1', '-1', '-1', '-1', '-1', '-1'],
+          kategorie: Kategorie.evil,
+          anzahlImDeckMax: 1,
+        );
+        final unten = testKarte('unten', ['0', '0', '0', '0', '0', '0']);
+        // Nach dem Legen: [umordner, evil, unten]; Evil ganz nach unten.
+        final (neu, _) = engine.apply(stateMit([evil, unten]), bauen(1, 2));
+        final stapel = neu.spielerMitId('p1').spielfelder[0].stapel;
+        expect(stapel.map((l) => l.karte.id).toList(), ['umordner', 'unten', 'evil']);
+      });
+    });
+
     test('gebietserweiterung fügt ein viertes Spielfeld hinzu', () {
       final karte = testKarte(
         'gebiet',

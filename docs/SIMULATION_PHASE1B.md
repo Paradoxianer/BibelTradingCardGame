@@ -291,12 +291,11 @@ Spannung bleiben gleich, die Wertung schwankt minimal stärker.
 Evil-Karten werden später wieder gezogen. Passt zur D6-Entscheidung,
 dass die Karte nicht nötig ist.
 
-**Offen (Regelfrage, nicht entschieden):** EFFEKTE §2.8 sagt „Startkarte
-ist ausgenommen“, die Engine prüft das aber nicht — `umordnung` kann dort
-die Startkarte verschieben. Der Bot lässt sie in dieser Messung samt
-Position unberührt. Ebenfalls unklar: ob eigene Evil-Karten verschoben
-werden dürfen (der Bot darf es hier, z. B. um eine Evil-Karte tiefer zu
-legen).
+**Regelfrage geklärt (2026-10-09):** Die Startkarte bleibt samt Position
+unberührt — die Engine erzwingt das jetzt (vorher nur in EFFEKTE §2.8
+beschrieben, nicht geprüft). Eigene Evil-Karten dürfen versetzt werden, so
+wie der Bot es in dieser Messung schon getan hat; die Messwerte gelten also
+unverändert.
 
 ## Bekannte Grenzen
 

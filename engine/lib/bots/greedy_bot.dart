@@ -76,7 +76,7 @@ class GreedyBot implements Bot {
   /// Effektkarte selbst schon auf Feld [gebautAuf] liegt — und nimmt die mit
   /// der besten Wertung. Die Startkarte bleibt unberührt, samt ihrer
   /// Position: verschoben wird nur oberhalb von ihr (EFFEKTE §2.8 "Startkarte
-  /// ist ausgenommen"; die Engine prüft das bisher nicht).
+  /// ist ausgenommen", die Engine lehnt alles andere ab).
   (UmordnungWahl, int) _besteUmordnung(GameState state, Spieler nachBau, int gebautAuf) {
     // Kein Gewinn möglich: dann eine erlaubte Nicht-Verschiebung.
     var beste = UmordnungWahl(feldIndex: gebautAuf, vonTiefe: 0, nachTiefe: 0);
