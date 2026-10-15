@@ -175,6 +175,15 @@ für ein veröffentlichtes Spiel braucht es dafür eine Lizenz. Gemeinfrei sind
 z. B. Luther 1912 und Elberfelder 1905 — sprachlich aber alt für Kinder.
 Alternative: Bibeltext in eigenen Worten nacherzählen und die Stelle angeben.
 
+**Entscheidung (2026-10-15): vorerst Menge-Bibel.** Gemeinfrei ist nur die
+Fassung von **1939** (letzter von Hermann Menge selbst bearbeiteter Text,
+† 1939). Die späteren Revisionen der Deutschen Bibelgesellschaft (1994, 2020)
+sind geschützt und dürfen nicht verwendet werden. Verlässliche maschinenlesbare
+Quelle: SWORD-Modul `GerMenge` (CrossWire, Lizenz Public Domain). Die
+bestehenden Karten in `base.json` stammen aus gemischten Übersetzungen (u. a.
+NGÜ, erkennbar an ´…`-Markierungen) und müssen vor einer Veröffentlichung
+ebenfalls auf Menge 1939 umgestellt werden.
+
 **Kategorie-Balance:** Nach diesen 81 Karten wäre `gebet` mit 66 von 167
 Karten (40 %) immer noch die größte Kategorie. Ob das unter den Zielwert von
 35 % des Punktebeitrags reicht, zeigt erst der Simulator nach dem Eintragen.
@@ -184,8 +193,7 @@ zweimal 1. Timotheus 2,1).
 
 ## Weiteres Vorgehen
 
-1. Du wählst aus (oder ergänzt eigene) und legst Bibeltext bzw.
-   Übersetzung fest.
+1. Du wählst aus (oder ergänzt eigene). Übersetzung: Menge 1939 (s. o.).
 2. Ich trage die Karten in Batches in `data/sets/base.json` ein — Slot-Werte
    nach Person-Schwerpunkt und Personen-Bilanz.
 3. Nach jedem Batch Simulator-Check (`kategorieAnteile`, `personAnteile`)
